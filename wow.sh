@@ -12,12 +12,14 @@ set -euo pipefail
 #
 # - 启动时中文交互提示：域名回车默认 sharq.eu.org
 # - 自动放行 80/443（尽量：ufw / firewalld / nftables / iptables）
+#   * 优化：只放行 TCP（HTTP/HTTPS 不需要 UDP）
 # - Debian：使用 Sury PHP 源安装 PHP 8.2
 # - Ubuntu：使用 ondrej/php PPA 安装 PHP 8.2
 # - 下载并解压 html.rar 到 /www/wow
 # - 仅限制 PHP-FPM 的 open_basedir（不影响 CLI/composer）
 # - certbot webroot 方式签证书，启用 HTTPS 443
 # - 自动把 application/config/config.php 里的 https://sharq.eu.org 替换为新域名
+# - 优化：Composer 允许 root 执行（减少提示），并保持非交互
 #
 # 默认：
 # - 站点目录：/www/wow
@@ -36,7 +38,7 @@ REPO_RAW_BASE="https://raw.githubusercontent.com/byilrq/wow/main"
 ARCHIVE_URL="${REPO_RAW_BASE}/html.rar"
 PHP_INI_URL="${REPO_RAW_BASE}/php.ini"
 
-# 你项目里 config.php 默认基准域名（你已改为 https://sharq.eu.org）
+# config.php 默认基准域名（你已改为 https://sharq.eu.org）
 DEFAULT_CONFIG_BASE="https://sharq.eu.org"
 
 # certbot 注册邮箱（可运行前覆盖：EMAIL=xxx@xx.com sudo ./wow.sh）
@@ -98,7 +100,7 @@ backup_file() {
 #==========================================================
 get_saved_domain() {
   if [[ -f "$DOMAIN_STATE_FILE" ]]; then
-    cat "$DOMAIN_STATE_FILE" | tr -d '\r\n' || true
+    tr -d '\r\n' < "$DOMAIN_STATE_FILE" || true
   fi
 }
 save_domain() {
@@ -107,18 +109,18 @@ save_domain() {
 }
 
 #==========================================================
-# 防火墙函数：放行 80/443
+# 防火墙函数：放行 80/443（只放行 TCP）
 # 作用：尽量自动开放端口（仍建议云厂商安全组也放行）
 #==========================================================
 open_firewall_ports() {
-  log "尝试放行 80/443 端口（如果外网仍打不开，请检查云厂商安全组是否放行）..."
+  log "尝试放行 80/443 端口（仅 TCP；若外网仍打不开，请检查云厂商安全组）..."
 
-  # UFW（Ubuntu 常见）
+  # UFW（Ubuntu 常见 / 你机器也有）
   if command -v ufw >/dev/null 2>&1; then
     ufw allow 80/tcp || true
     ufw allow 443/tcp || true
     ufw status || true
-    echo "✅ 已通过 ufw 尝试放行 80/443"
+    echo "✅ 已通过 ufw 尝试放行 80/443 (TCP)"
     return 0
   fi
 
@@ -135,7 +137,7 @@ open_firewall_ports() {
   if command -v nft >/dev/null 2>&1 && systemctl is-enabled nftables >/dev/null 2>&1; then
     nft add rule inet filter input tcp dport 80 accept 2>/dev/null || true
     nft add rule inet filter input tcp dport 443 accept 2>/dev/null || true
-    echo "✅ 已尝试通过 nftables runtime 规则放行 80/443（重启可能失效，需自行固化）"
+    echo "✅ 已尝试通过 nftables runtime 规则放行 80/443 (TCP)（重启可能失效，需自行固化）"
     return 0
   fi
 
@@ -147,9 +149,9 @@ open_firewall_ports() {
     # 尝试持久化（可选）
     if apt-get install -y iptables-persistent >/dev/null 2>&1; then
       netfilter-persistent save >/dev/null 2>&1 || true
-      echo "✅ 已通过 iptables 放行并尝试持久化 80/443"
+      echo "✅ 已通过 iptables 放行并尝试持久化 80/443 (TCP)"
     else
-      echo "✅ 已通过 iptables 放行 80/443（未持久化，重启可能失效）"
+      echo "✅ 已通过 iptables 放行 80/443 (TCP)（未持久化，重启可能失效）"
     fi
     return 0
   fi
@@ -190,7 +192,7 @@ setup_php_repo() {
   local os_id="$1" codename="$2"
 
   if [[ "$os_id" == "debian" ]]; then
-    log "检测到 Debian：配置 Sury PHP 仓库（$codename）..."
+    log "检测到 Debian：配置 Sury PHP 仓库（${codename}）..."
     apt-get update -y
     apt-get install -y ca-certificates curl gnupg lsb-release
 
@@ -452,8 +454,9 @@ run_composer_install() {
   fi
 
   if [[ -n "$dir" ]]; then
-    log "执行 composer install（非必需，若失败可忽略）：${dir}"
+    log "执行 composer install（非必需；若失败可忽略）：${dir}"
     mkdir -p "${dir}/vendor" || true
+    export COMPOSER_ALLOW_SUPERUSER=1
     (cd "$dir" && php -d open_basedir= /usr/local/bin/composer install --no-interaction --prefer-dist --optimize-autoloader) || true
   fi
 }
@@ -478,7 +481,6 @@ obtain_cert_webroot_if_needed() {
   mkdir -p "${WEB_ROOT}/.well-known/acme-challenge"
   chown -R www-data:www-data "${WEB_ROOT}/.well-known" || true
 
-  # 签证书前保证 80 站点可用
   write_nginx_site_http_only "$domain"
 
   certbot certonly \
@@ -498,7 +500,7 @@ renew_certs_and_reload() {
   apt-get install -y certbot >/dev/null 2>&1 || true
 
   certbot renew --quiet --deploy-hook "systemctl reload nginx" || true
-  echo "✅ 续期命令已执行（如果未到续期窗口，certbot 会自动跳过）"
+  echo "✅ 已执行续期命令（如果未到续期窗口，certbot 会自动跳过）"
 }
 
 #==========================================================
@@ -507,7 +509,6 @@ renew_certs_and_reload() {
 #==========================================================
 do_install() {
   local domain="$1"
-
   local os_id codename
   IFS='|' read -r os_id codename <<<"$(get_os_info)"
 
@@ -635,7 +636,7 @@ do_change_domain() {
   [[ -z "$old_domain" ]] && old_domain="$DEFAULT_DOMAIN"
 
   echo "当前记录域名：${old_domain}"
-  read -rp "请输入新域名（回车取消）：" new_domain
+  read -rp "请输入新域名（回车取消）： " new_domain
   if [[ -z "${new_domain}" ]]; then
     echo "已取消。"
     return 0
@@ -669,7 +670,6 @@ do_update_cert() {
   echo "当前记录域名：${d}"
   renew_certs_and_reload
 
-  # 简单展示 443 是否监听
   if ss -lntp 2>/dev/null | grep -q ':443'; then
     echo "✅ 当前系统已监听 443"
   else

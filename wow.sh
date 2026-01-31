@@ -35,7 +35,7 @@ WEB_ROOT="${WEB_ROOT:-/www/wow}"
 PHP_VER="${PHP_VER:-8.2}"
 
 REPO_RAW_BASE="https://raw.githubusercontent.com/byilrq/wow/main"
-ARCHIVE_URL="${REPO_RAW_BASE}/html.rar"
+ARCHIVE_URL="${REPO_RAW_BASE}/wow.rar"
 PHP_INI_URL="${REPO_RAW_BASE}/php.ini"
 
 # config.php 默认基准域名（你已改为 https://sharq.eu.org）

@@ -24,8 +24,10 @@ $config['debug_mode'] = env_bool('APP_DEBUG', true); // 如果遇到空白页或
 
 // 服务器信息 - 按你的服务器实际情况设置。
 $config['realmlist'] = env('REALMLIST', 'sharq.eu.org'); // 服务器 Realmlist（玩家登录IP）
-$config['patch_location'] = env('PATCH_LOCATION', 'http://mypatch.com/patch.mpq'); // 补丁地址（无 ?
+$config['patch_location'] = env('PATCH_LOCATION', '/downloads/WOWOL.bat'); // 登录器下载链接（安装脚本会把 GitHub 仓库根目录的 WOWOL.bat 同步到 public/downloads/WOWOL.bat）
 $config['game_version'] = env('GAME_VERSION', '3.3.5a (12340)'); // 服务器运行的游戏版本
+$config['launcher_file'] = env('LAUNCHER_FILE', 'downloads/WOWOL.bat'); // 登录器文件相对 public 目录的路径，默认可通过 /downloads/WOWOL.bat 下载
+$config['launcher_label'] = env('LAUNCHER_LABEL', '登录器下载'); // 首页显示的下载链接文字
 
 /* 资料片设置 - 通过数字选择你服务器的资料片版本：
 0 = 经典旧世 (Classic)

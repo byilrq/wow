@@ -1,137 +1,134 @@
 # 黑石 WoW 注册站
 
-这是一个面向私服魔兽世界的轻量注册站，采用新架构实现注册页、首页在线状态、公告页，文件数量少，部署边界清晰。
+这是一个精简架构的 WoW 私服注册与信息展示站点，包含：
 
-## 结构
+- 首页 + 在线玩家列表
+- 注册页面
+- 公告页面，可通过 PIN 添加/删除公告
+- 登录器下载链接 `/downloads/WOWOL.bat`
+- Nginx 本地网站配置
+- Nginx stream 游戏流量转发：TCP 3724 / 8085
+
+## 目录结构
 
 ```text
-public/index.php          # 唯一 Web 入口
-public/assets/style.css   # 页面样式
-src/WowApp.php            # 注册、首页在线玩家、公告、验证码、公告管理核心
-config.php                # 保留原 WOW_Web 配置参数与中文注释
+public/index.php          # Web 入口
+public/assets/style.css   # 样式
+public/downloads/         # 登录器下载目录，安装时自动放入 WOWOL.bat
+src/WowApp.php            # 核心逻辑
 storage/announcements.json# 公告数据
-wow.py                    # 只负责注册站安装和 Nginx 配置
-h.sh                      # Hysteria 2 安装/管理脚本，可选择外部伪装站或本机 WoW 注册站
+config.php                # 配置文件，保留中文注释
+wow.sh                    # 主安装/更新脚本
+wow.py                    # 兼容入口，调用 wow.sh
+h.sh                      # Hysteria 安装脚本
 ```
 
-## 重要边界
+## 部署
 
-`wow.py` 只负责：
+上传到 GitHub 后，在 VPS 上运行：
 
-- 安装 PHP 8.2 / PHP-FPM / Nginx / Git / rsync。
-- 从 GitHub 仓库拉取本程序。
-- 写入 `/www/wow`。
-- 生成 `.env`。
-- 配置 Nginx。
+```bash
+wget -N --no-check-certificate https://raw.githubusercontent.com/byilrq/wow/main/wow.sh
+sudo bash wow.sh
+```
 
-`wow.py` 不会修改 Hysteria、Xray、Caddy 等代理工具配置，也不会重启这些服务。
+新版要求：网站安装、依赖安装、Nginx 网站配置、Nginx 游戏流量转发配置，都由 `wow.sh` 统一实现。如果系统已安装 Nginx/PHP，脚本会继续更新配置并 reload。
 
-如果公网 443 已经被 Hysteria 占用，请使用默认的 `local_proxy` 模式。此时 Nginx 只监听：
+## 网站监听模式
+
+默认模式是：
+
+```bash
+WOW_BIND_MODE=local_proxy
+LOCAL_BIND_HOST=127.0.0.1
+LOCAL_HTTP_PORT=8080
+```
+
+适合 Hysteria / Xray / Caddy 已占用公网 443 的服务器。此时网站只监听本机：
 
 ```text
 http://127.0.0.1:8080
 ```
 
-然后在 Hysteria 中选择“本机 WoW 注册站”作为伪装站。
+然后由你的代理工具手动反代到这个地址。
 
-## 安装 WoW 注册站
-
-```bash
-wget -N --no-check-certificate https://raw.githubusercontent.com/byilrq/wow/main/wow.py
-sudo python3 wow.py
-```
-
-默认模式：
+如果你希望 Nginx 直接管理公网 80/443：
 
 ```bash
-WOW_BIND_MODE=local_proxy sudo -E python3 wow.py
+WOW_BIND_MODE=public_https sudo -E bash wow.sh
 ```
 
-公网直连 HTTPS 模式：
+## 登录器下载
 
-```bash
-WOW_BIND_MODE=public_https sudo -E python3 wow.py
-```
-
-## 安装 Hysteria 并选择伪装站
-
-```bash
-sudo bash h.sh
-```
-
-安装或修改伪装站时会出现：
+把 `WOWOL.bat` 放在 GitHub 仓库根目录。安装时 `wow.sh` 会自动复制到：
 
 ```text
-1. 外部伪装站
-2. 本机 WoW 注册站
+/www/wow/public/downloads/WOWOL.bat
 ```
 
-选择本机 WoW 注册站时，脚本会写入：
+网页首页会显示“登录器下载”，浏览器访问：
 
-```yaml
-masquerade:
-  type: proxy
-  proxy:
-    url: http://127.0.0.1:8080
-    rewriteHost: false
-  listenHTTPS: :443
+```text
+/downloads/WOWOL.bat
+```
+
+## 游戏流量转发
+
+保留旧版 Nginx stream 转发能力。默认配置：
+
+```bash
+GAME_PROXY_ENABLE=true
+GAME_PROXY_TARGET_HOST=byilrq.iok.la
+GAME_PROXY_AUTH_PORT=3724
+GAME_PROXY_WORLD_PORT=8085
+```
+
+脚本会生成：
+
+```text
+/etc/nginx/stream-conf.d/wow-game-proxy.conf
+```
+
+效果：
+
+```text
+玩家 -> 本 VPS:3724 -> byilrq.iok.la:3724
+玩家 -> 本 VPS:8085 -> byilrq.iok.la:8085
+```
+
+这对应旧版 `nginx.conf` 里的 `stream` 配置。
+
+如需关闭游戏转发：
+
+```bash
+GAME_PROXY_ENABLE=false sudo -E bash wow.sh
+```
+
+## Hysteria 说明
+
+`wow.sh` 不会修改 Hysteria 配置。Hysteria 安装和伪装站选择由 `h.sh` 管理。你可以选择外部伪装站，也可以选择本地 WoW 站：
+
+```text
+http://127.0.0.1:8080
 ```
 
 ## 配置
 
-配置文件是 `config.php`，保留原配置参数和中文注释。也支持 `.env` 覆盖常用参数。
-
-验证码参数：
-
-```php
-$config['captcha_type'] = 1; // 0(图形验证码), 1(HCaptcha), 2(ReCaptcha v2), >2(禁用验证码)
-$config['captcha_key'] = '...';
-$config['captcha_secret'] = '...';
-$config['captcha_language'] = 'en';
-```
-
-公告管理 PIN：
-
-```php
-$config['announcement_pin'] = '0819';
-```
-
-## 公告管理
-
-进入公告页后可以手动输入公告。添加或删除公告时，页面会弹出 PIN 输入框，默认 PIN：
-
-```text
-0819
-```
-
-## 测试
-
-本机模式下测试：
-
-```bash
-curl -I http://127.0.0.1:8080
-```
-
-使用 Hysteria 反代时，用浏览器访问：
-
-```text
-https://你的域名/
-```
-
-## 流畅度修复说明
-
-本版优化了注册页切回首页/公告页时的卡顿问题：
-
-- 注册写库或 SOAP 前会提前释放 PHP session 锁，避免后续页面请求排队。
-- 首页在线玩家状态增加短缓存，默认 15 秒，避免每次切页都实时访问远程角色库。
-- 数据库连接默认短超时，远程数据库异常时不会长时间拖住页面。
-- 首页不再为了显示在线玩家而每次访问 auth 库读取账号数/realmlist。
-
-可在 `.env` 中调整：
+`.env` 可覆盖 `config.php` 中的参数，例如：
 
 ```env
-DB_TIMEOUT=2
-NETWORK_TIMEOUT=3
-PHP_REQUEST_TIMEOUT=12
-STATUS_CACHE_SECONDS=15
+APP_NAME=黑石
+REALMLIST=你的域名
+LAUNCHER_FILE=downloads/WOWOL.bat
+LAUNCHER_LABEL=登录器下载
+DB_AUTH_HOST=byilrq.iok.la
+DB_AUTH_PORT=58006
+GAME_PROXY_ENABLE=true
+GAME_PROXY_TARGET_HOST=byilrq.iok.la
 ```
+
+## 本版更新：在线玩家图标与地图位置
+
+- 在线玩家列表中“种族 / 职业”改为使用旧模板图标显示，图标位于 `public/assets/icons/race/` 与 `public/assets/icons/class/`。
+- 在线玩家列表新增“地图位置”列，优先读取角色库 `characters.zone`，其次读取 `characters.map`。
+- 已内置 WotLK / AzerothCore 常见地图与区域中文名；未收录时显示 `区域ID: xxx` 或 `地图ID: xxx`，不影响页面打开。

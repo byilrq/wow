@@ -114,6 +114,19 @@ final class WowApp
         return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
+
+    private function launcherUrl(): string
+    {
+        $file = trim((string)$this->cfg('launcher_file', 'downloads/WOWOL.bat'));
+        if ($file === '') {
+            $file = trim((string)$this->cfg('patch_location', '/downloads/WOWOL.bat'));
+        }
+        if (preg_match('#^https?://#i', $file) || str_starts_with($file, '/')) {
+            return $file;
+        }
+        return '/' . ltrim($file, '/');
+    }
+
     private function storagePath(): string
     {
         return dirname(__DIR__) . '/storage/announcements.json';
@@ -495,18 +508,93 @@ final class WowApp
     private function onlinePlayers(PDO $db, string $realmName, int $limit): array
     {
         $limit = max(1, min(49, $limit));
-        $sql = "SELECT name, race, class, level FROM characters WHERE online = 1 ORDER BY level DESC, name ASC LIMIT {$limit}";
+        $hasGender = $this->columnExistsIn($db, 'characters', 'gender');
+        $hasMap = $this->columnExistsIn($db, 'characters', 'map');
+        $hasZone = $this->columnExistsIn($db, 'characters', 'zone');
+
+        $columns = ['name', 'race', 'class', 'level'];
+        if ($hasGender) {
+            $columns[] = 'gender';
+        }
+        if ($hasMap) {
+            $columns[] = 'map';
+        }
+        if ($hasZone) {
+            $columns[] = 'zone';
+        }
+
+        $sql = 'SELECT ' . implode(', ', $columns) . " FROM characters WHERE online = 1 ORDER BY level DESC, name ASC LIMIT {$limit}";
         $players = [];
         foreach ($db->query($sql) as $row) {
+            $race = (int)($row['race'] ?? 0);
+            $class = (int)($row['class'] ?? 0);
+            $gender = (int)($row['gender'] ?? 0);
+            $map = isset($row['map']) ? (int)$row['map'] : null;
+            $zone = isset($row['zone']) ? (int)$row['zone'] : null;
+
             $players[] = [
                 'name' => (string)($row['name'] ?? ''),
-                'race' => $this->raceName((int)($row['race'] ?? 0)),
-                'class' => $this->className((int)($row['class'] ?? 0)),
+                'race_id' => $race,
+                'race' => $this->raceName($race),
+                'race_icon' => $this->raceIconUrl($race, $gender),
+                'class_id' => $class,
+                'class' => $this->className($class),
+                'class_icon' => $this->classIconUrl($class),
                 'level' => (int)($row['level'] ?? 0),
+                'map' => $map,
+                'zone' => $zone,
+                'location' => $this->locationName($map, $zone),
                 'realm' => $realmName,
             ];
         }
         return $players;
+    }
+
+    private function columnExistsIn(PDO $db, string $table, string $column): bool
+    {
+        static $cache = [];
+        $key = spl_object_id($db) . ':' . $table . ':' . $column;
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
+        }
+        try {
+            $stmt = $db->prepare('SHOW COLUMNS FROM ' . $this->safeName($table) . ' LIKE :column');
+            $stmt->execute([':column' => $column]);
+            return $cache[$key] = (bool)$stmt->fetch();
+        } catch (Throwable) {
+            return $cache[$key] = false;
+        }
+    }
+
+    private function iconUrl(string $type, string $file): ?string
+    {
+        $relative = 'assets/icons/' . trim($type, '/') . '/' . ltrim($file, '/');
+        $absolute = dirname(__DIR__) . '/public/' . $relative;
+        return is_file($absolute) ? '/' . $relative : null;
+    }
+
+    private function raceIconUrl(int $race, int $gender = 0): ?string
+    {
+        foreach (["{$race}-{$gender}.gif", "{$race}-{$gender}-0.gif", "{$race}-0.gif", "{$race}-0-0.gif"] as $file) {
+            $url = $this->iconUrl('race', $file);
+            if ($url !== null) {
+                return $url;
+            }
+        }
+        return null;
+    }
+
+    private function classIconUrl(int $class): ?string
+    {
+        return $this->iconUrl('class', $class . '.gif');
+    }
+
+    private function iconImg(?string $url, string $alt): string
+    {
+        if ($url === null) {
+            return '<span class="icon-fallback">' . $this->h($alt) . '</span>';
+        }
+        return '<img class="wow-icon" src="' . $this->h($url) . '" alt="' . $this->h($alt) . '" title="' . $this->h($alt) . '" loading="lazy">';
     }
 
     private function raceName(int $race): string
@@ -539,6 +627,57 @@ final class WowApp
             9 => '术士',
             11 => '德鲁伊',
         ][$class] ?? '未知';
+    }
+
+    private function locationName(?int $map, ?int $zone = null): string
+    {
+        $zones = [
+            1 => '丹莫罗', 3 => '荒芜之地', 4 => '诅咒之地', 8 => '悲伤沼泽', 10 => '暮色森林', 11 => '湿地',
+            12 => '艾尔文森林', 14 => '杜隆塔尔', 15 => '尘泥沼泽', 16 => '艾萨拉', 17 => '贫瘠之地', 28 => '西瘟疫之地',
+            33 => '荆棘谷', 36 => '奥特兰克山脉', 38 => '洛克莫丹', 40 => '西部荒野', 41 => '逆风小径', 44 => '赤脊山',
+            45 => '阿拉希高地', 46 => '燃烧平原', 47 => '辛特兰', 51 => '灼热峡谷', 85 => '提瑞斯法林地', 130 => '银松森林',
+            139 => '东瘟疫之地', 141 => '泰达希尔', 148 => '黑海岸', 215 => '莫高雷', 267 => '希尔斯布莱德丘陵', 331 => '灰谷',
+            357 => '菲拉斯', 361 => '费伍德森林', 400 => '千针石林', 405 => '凄凉之地', 406 => '石爪山脉', 440 => '塔纳利斯',
+            490 => '安戈洛环形山', 493 => '月光林地', 618 => '冬泉谷', 1377 => '希利苏斯', 1497 => '幽暗城', 1519 => '暴风城',
+            1537 => '铁炉堡', 1637 => '奥格瑞玛', 1638 => '雷霆崖', 1657 => '达纳苏斯', 3430 => '永歌森林', 3433 => '幽魂之地',
+            3483 => '地狱火半岛', 3487 => '银月城', 3518 => '纳格兰', 3519 => '泰罗卡森林', 3520 => '影月谷', 3521 => '赞加沼泽',
+            3522 => '刀锋山', 3523 => '虚空风暴', 3524 => '秘蓝岛', 3525 => '秘血岛', 3537 => '北风苔原', 3557 => '埃索达',
+            3703 => '沙塔斯城', 3711 => '索拉查盆地', 4080 => '奎尔丹纳斯岛', 4197 => '冬拥湖', 4298 => '血色领地',
+            4395 => '达拉然', 65 => '龙骨荒野', 66 => '祖达克', 67 => '风暴峭壁', 210 => '冰冠冰川', 394 => '灰熊丘陵',
+            495 => '嚎风峡湾', 2817 => '晶歌森林', 4100 => '净化斯坦索姆', 4264 => '岩石大厅', 4265 => '闪电大厅', 4273 => '奥杜尔',
+            4494 => '安卡赫特：古代王国', 4722 => '十字军的试炼', 4812 => '冰冠堡垒',
+        ];
+        if ($zone !== null && isset($zones[$zone])) {
+            return $zones[$zone];
+        }
+
+        $maps = [
+            0 => '东部王国', 1 => '卡利姆多', 30 => '奥特兰克山谷', 33 => '影牙城堡', 34 => '暴风城监狱', 36 => '死亡矿井',
+            43 => '哀嚎洞穴', 47 => '剃刀沼泽', 48 => '黑暗深渊', 70 => '奥达曼', 90 => '诺莫瑞根', 109 => '沉没的神庙',
+            129 => '剃刀高地', 189 => '血色修道院', 209 => '祖尔法拉克', 229 => '黑石塔', 230 => '黑石深渊', 249 => '奥妮克希亚的巢穴',
+            269 => '开启黑暗之门', 289 => '通灵学院', 309 => '祖尔格拉布', 329 => '斯坦索姆', 349 => '玛拉顿', 369 => '矿道地铁',
+            409 => '熔火之心', 429 => '厄运之槌', 469 => '黑翼之巢', 489 => '战歌峡谷', 529 => '阿拉希盆地', 530 => '外域',
+            531 => '安其拉神殿', 532 => '卡拉赞', 533 => '纳克萨玛斯', 534 => '海加尔山之战', 540 => '地狱火城墙', 542 => '鲜血熔炉',
+            543 => '破碎大厅', 544 => '玛瑟里顿的巢穴', 545 => '蒸汽地窟', 546 => '幽暗沼泽', 547 => '奴隶围栏', 548 => '毒蛇神殿',
+            550 => '风暴要塞', 552 => '禁魔监狱', 553 => '生态船', 554 => '能源舰', 555 => '暗影迷宫', 556 => '塞泰克大厅',
+            557 => '法力陵墓', 558 => '奥金尼地穴', 560 => '旧希尔斯布莱德丘陵', 562 => '刀锋山竞技场', 564 => '黑暗神殿', 565 => '格鲁尔的巢穴',
+            566 => '风暴之眼', 568 => '祖阿曼', 571 => '诺森德', 572 => '洛丹伦废墟', 574 => '乌特加德城堡', 575 => '乌特加德之巅',
+            576 => '魔枢', 578 => '魔环', 580 => '太阳之井高地', 585 => '魔导师平台', 595 => '净化斯坦索姆', 598 => '太阳之井高地',
+            599 => '岩石大厅', 600 => '达克萨隆要塞', 601 => '艾卓-尼鲁布', 602 => '闪电大厅', 603 => '奥杜尔', 604 => '古达克',
+            608 => '紫罗兰监狱', 615 => '黑曜石圣殿', 616 => '永恒之眼', 617 => '达拉然下水道', 618 => '勇气竞技场', 619 => '安卡赫特：古代王国',
+            624 => '阿尔卡冯的宝库', 628 => '征服之岛', 631 => '冰冠堡垒', 632 => '灵魂洪炉', 649 => '十字军的试炼', 650 => '冠军的试炼',
+            658 => '萨隆矿坑', 668 => '映像大厅', 724 => '红玉圣殿',
+        ];
+        if ($map !== null && isset($maps[$map])) {
+            return $maps[$map];
+        }
+        if ($zone !== null && $zone > 0) {
+            return '区域ID: ' . $zone;
+        }
+        if ($map !== null && $map >= 0) {
+            return '地图ID: ' . $map;
+        }
+        return '未知位置';
     }
 
     private function announcements(): array
@@ -613,6 +752,7 @@ final class WowApp
                 <p class="eyebrow">黑石 · 私服注册站</p>
                 <h1><?= $this->h($realmName) ?></h1>
                 <p>注册账号、查看在线玩家、阅读最新公告。客户端 Realmlist：<code>set realmlist <?= $this->h($this->cfg('realmlist')) ?></code></p>
+                <p class="launcher-line"><a class="download-link" href="<?= $this->h($this->launcherUrl()) ?>" download><?= $this->h($this->cfg('launcher_label', '登录器下载')) ?></a></p>
                 <div class="actions">
                     <a class="btn primary" href="?page=register">立即注册</a>
                     <a class="btn" href="#online-players">在线玩家</a>
@@ -625,7 +765,7 @@ final class WowApp
             </div>
         </section>
         <section class="grid two">
-            <div class="card"><h2>服务器信息</h2><p>服务器：<?= $this->h($realmName) ?></p><p>版本：<?= $this->h($this->cfg('game_version')) ?></p><p>Realmlist：<?= $this->h($this->cfg('realmlist')) ?></p><p>补丁地址：<?= $this->h($this->cfg('patch_location')) ?></p></div>
+            <div class="card"><h2>服务器信息</h2><p>服务器：<?= $this->h($realmName) ?></p><p>版本：<?= $this->h($this->cfg('game_version')) ?></p><p>Realmlist：<?= $this->h($this->cfg('realmlist')) ?></p><p><?= $this->h($this->cfg('launcher_label', '登录器下载')) ?>：<a href="<?= $this->h($this->launcherUrl()) ?>" download><?= $this->h(basename((string)$this->cfg('launcher_file', 'downloads/WOWOL.bat'))) ?></a></p></div>
             <div class="card"><h2>最新公告</h2><?= $this->announcementList(2, false) ?></div>
         </section>
         <?= $this->onlinePlayersTable($status) ?>
@@ -648,17 +788,18 @@ final class WowApp
             </div>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>角色</th><th>种族</th><th>职业</th><th>等级</th></tr></thead>
+                    <thead><tr><th>角色</th><th>种族</th><th>职业</th><th>等级</th><th>地图位置</th></tr></thead>
                     <tbody>
                     <?php if (!$players): ?>
-                        <tr><td colspan="4" class="empty-row">当前没有在线玩家，或角色数据库暂时无法读取。</td></tr>
+                        <tr><td colspan="5" class="empty-row">当前没有在线玩家，或角色数据库暂时无法读取。</td></tr>
                     <?php endif; ?>
                     <?php foreach ($players as $player): ?>
                         <tr>
                             <td><?= $this->h($player['name'] ?? '') ?></td>
-                            <td><?= $this->h($player['race'] ?? '') ?></td>
-                            <td><?= $this->h($player['class'] ?? '') ?></td>
+                            <td class="icon-cell"><?= $this->iconImg($player['race_icon'] ?? null, (string)($player['race'] ?? '未知种族')) ?></td>
+                            <td class="icon-cell"><?= $this->iconImg($player['class_icon'] ?? null, (string)($player['class'] ?? '未知职业')) ?></td>
                             <td><?= (int)($player['level'] ?? 0) ?></td>
+                            <td><?= $this->h($player['location'] ?? '未知位置') ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

@@ -7,3 +7,26 @@ footer{text-align:center;color:var(--muted);padding:28px}@media(max-width:760px)
 .captcha-status{color:var(--muted);font-size:14px;margin-bottom:10px}.captcha-fallback{margin-top:10px;padding:12px;border:1px dashed var(--border);border-radius:14px;background:rgba(255,255,255,.035)}.captcha-fallback p{margin:0 0 10px;color:var(--muted)}.local-captcha{margin-top:8px}
 
 .muted{color:var(--muted);font-size:14px}
+
+.launcher-line { margin-top: 14px; }
+.download-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    background: rgba(255,255,255,.12);
+    border: 1px solid rgba(255,255,255,.22);
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+}
+.download-link:hover { transform: translateY(-1px); }
+
+/* 在线玩家图标列 */
+.icon-cell{width:68px;text-align:center;vertical-align:middle}
+.wow-icon{width:26px;height:26px;border-radius:5px;image-rendering:auto;vertical-align:middle;box-shadow:0 0 0 1px rgba(255,255,255,.18),0 4px 12px rgba(0,0,0,.35)}
+.icon-fallback{display:inline-flex;align-items:center;justify-content:center;min-width:42px;padding:4px 6px;border-radius:999px;background:rgba(255,255,255,.08);color:var(--muted);font-size:12px;font-weight:800}
+.online-players td:nth-child(4){font-weight:900;color:#fff}
+.online-players td:nth-child(5){color:var(--muted);white-space:nowrap}
+@media(max-width:760px){.icon-cell{width:52px}.wow-icon{width:24px;height:24px}.online-players td:nth-child(5){white-space:normal}}

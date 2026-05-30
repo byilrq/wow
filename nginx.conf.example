@@ -1,20 +1,13 @@
-server {
-    listen 127.0.0.1:8080;
-    server_name _;
+# Nginx 示例：HTTP 网站由 sites-enabled 管理，游戏 TCP 代理由 stream-conf.d 管理。
+# wow.sh 会自动把 stream include 加入 /etc/nginx/nginx.conf。
 
-    root /www/wow/public;
-    index index.php index.html;
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    include /etc/nginx/conf.d/*.conf;
+    include /etc/nginx/sites-enabled/*;
+}
 
-    location / {
-        try_files $uri $uri/ /index.php?$query_string;
-    }
-
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
-    }
-
-    location ~ /\. {
-        deny all;
-    }
+stream {
+    include /etc/nginx/stream-conf.d/*.conf;
 }

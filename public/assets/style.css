@@ -47,7 +47,7 @@ footer{text-align:center;color:var(--muted);padding:28px}@media(max-width:760px)
 /* 首页精简版：主视觉改为 WLK 图标，移除冗余说明与按钮 */
 .hero.hero-compact{grid-template-columns:1.2fr .8fr;min-height:260px}
 .wlk-logo-wrap{display:flex;align-items:center;justify-content:center;min-height:210px}
-.wlk-logo{width:min(300px,70vw);max-height:240px;filter:drop-shadow(0 18px 45px rgba(88,190,255,.24)) drop-shadow(0 0 22px rgba(244,181,74,.15))}
+.wlk-logo{width:min(520px,92vw);max-width:100%;max-height:280px;object-fit:contain;filter:drop-shadow(0 18px 45px rgba(88,190,255,.24)) drop-shadow(0 0 22px rgba(244,181,74,.15))}
 .launcher-download-row{display:flex;align-items:center;gap:12px;color:var(--muted);font-weight:800}
 .launcher-download-row span{color:#fff;letter-spacing:.02em}
 .launcher-icon-link{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:12px;background:rgba(244,181,74,.16);border:1px solid rgba(244,181,74,.38);color:var(--gold);transition:transform .15s ease,filter .15s ease}

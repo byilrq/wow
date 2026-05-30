@@ -127,17 +127,8 @@ GAME_PROXY_ENABLE=true
 GAME_PROXY_TARGET_HOST=byilrq.iok.la
 ```
 
-## 本版更新：在线玩家图标与地图位置
+## 本版更新：在线玩家稳定显示
 
-- 在线玩家列表中“种族 / 职业”改为使用旧模板图标显示，图标位于 `public/assets/icons/race/` 与 `public/assets/icons/class/`。
-- 在线玩家列表新增“地图位置”列，优先读取角色库 `characters.zone`，其次读取 `characters.map`。
-- 已内置 WotLK / AzerothCore 常见地图与区域中文名；未收录时显示 `区域ID: xxx` 或 `地图ID: xxx`，不影响页面打开。
-
-## 在线玩家表格更新
-
-首页在线玩家列表现在显示：角色、种族图标、职业图标、等级、公会、头衔、地图位置。
-
-- 公会：从角色库 `guild_member` + `guild` 表读取；没有公会时显示 `-`。
-- 头衔：从 `characters.chosenTitle` 读取；未选择时显示 `None`，未知头衔显示 `Title #ID`。
-- 地图位置：优先使用 `characters.zone`，其次使用 `characters.map`，使用英文名称显示；未知区域会回退为 `Zone ID` 或 `Map ID`，不再显示“未知位置”。
-- 在线状态缓存文件已改为 `storage/status-cache-v2.json`，避免旧缓存继续显示旧的位置文本。
+- 在线玩家列表保留稳定字段：角色、种族图标、职业图标、等级。
+- 已取消公会、头衔、地图位置列，避免不同核心/数据库结构差异导致读取失败。
+- 当没有在线玩家或角色库暂时不可读时，统一提示：服务器离线！

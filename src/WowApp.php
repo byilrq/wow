@@ -508,61 +508,28 @@ final class WowApp
     private function onlinePlayers(PDO $db, string $realmName, int $limit): array
     {
         $limit = max(1, min(49, $limit));
-        $hasGender = $this->columnExistsIn($db, 'characters', 'gender');
-        $hasGuid = $this->columnExistsIn($db, 'characters', 'guid');
-        $hasMap = $this->columnExistsIn($db, 'characters', 'map');
-        $hasZone = $this->columnExistsIn($db, 'characters', 'zone');
-        $hasChosenTitle = $this->columnExistsIn($db, 'characters', 'chosenTitle');
-        $hasGuildTables = $hasGuid && $this->tableExistsIn($db, 'guild_member') && $this->tableExistsIn($db, 'guild');
 
-        $columns = ['c.name', 'c.race', 'c.class', 'c.level'];
-        if ($hasGender) {
-            $columns[] = 'c.gender';
-        }
-        if ($hasMap) {
-            $columns[] = 'c.map';
-        }
-        if ($hasZone) {
-            $columns[] = 'c.zone';
-        }
-        if ($hasChosenTitle) {
-            $columns[] = 'c.chosenTitle';
-        }
-        if ($hasGuildTables) {
-            $columns[] = 'g.name AS guild_name';
-        }
-
-        $sql = 'SELECT ' . implode(', ', $columns) . ' FROM characters c ';
-        if ($hasGuildTables) {
-            $sql .= 'LEFT JOIN guild_member gm ON gm.guid = c.guid LEFT JOIN guild g ON g.guildid = gm.guildid ';
-        }
-        $sql .= "WHERE c.online = 1 ORDER BY c.level DESC, c.name ASC LIMIT {$limit}";
+        // 只读取稳定字段，避免不同核心/数据库版本下 guild/title/map/zone 字段或关联表不一致导致状态页卡顿或报错。
+        $sql = "SELECT name, race, class, level FROM characters WHERE online = 1 ORDER BY level DESC, name ASC LIMIT {$limit}";
         $players = [];
+
         foreach ($db->query($sql) as $row) {
             $race = (int)($row['race'] ?? 0);
             $class = (int)($row['class'] ?? 0);
-            $gender = (int)($row['gender'] ?? 0);
-            $map = isset($row['map']) ? (int)$row['map'] : null;
-            $zone = isset($row['zone']) ? (int)$row['zone'] : null;
 
             $players[] = [
                 'name' => (string)($row['name'] ?? ''),
                 'race_id' => $race,
                 'race' => $this->raceName($race),
-                'race_icon' => $this->raceIconUrl($race, $gender),
+                'race_icon' => $this->raceIconUrl($race, 0),
                 'class_id' => $class,
                 'class' => $this->className($class),
                 'class_icon' => $this->classIconUrl($class),
                 'level' => (int)($row['level'] ?? 0),
-                'guild' => (string)($row['guild_name'] ?? ''),
-                'title_id' => isset($row['chosenTitle']) ? (int)$row['chosenTitle'] : 0,
-                'title' => $this->titleName(isset($row['chosenTitle']) ? (int)$row['chosenTitle'] : 0),
-                'map' => $map,
-                'zone' => $zone,
-                'location' => $this->locationName($map, $zone),
                 'realm' => $realmName,
             ];
         }
+
         return $players;
     }
 
@@ -864,10 +831,10 @@ final class WowApp
             </div>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>角色</th><th>种族</th><th>职业</th><th>等级</th><th>公会</th><th>头衔</th><th>地图位置</th></tr></thead>
+                    <thead><tr><th>角色</th><th>种族</th><th>职业</th><th>等级</th></tr></thead>
                     <tbody>
                     <?php if (!$players): ?>
-                        <tr><td colspan="7" class="empty-row">当前没有在线玩家，或角色数据库暂时无法读取。</td></tr>
+                        <tr><td colspan="4" class="empty-row offline-row">服务器离线！</td></tr>
                     <?php endif; ?>
                     <?php foreach ($players as $player): ?>
                         <tr>
@@ -875,9 +842,6 @@ final class WowApp
                             <td class="icon-cell"><?= $this->iconImg($player['race_icon'] ?? null, (string)($player['race'] ?? '未知种族')) ?></td>
                             <td class="icon-cell"><?= $this->iconImg($player['class_icon'] ?? null, (string)($player['class'] ?? '未知职业')) ?></td>
                             <td class="level-cell"><?= (int)($player['level'] ?? 0) ?></td>
-                            <td class="guild-cell"><?= $this->h(($player['guild'] ?? '') !== '' ? $player['guild'] : '-') ?></td>
-                            <td class="title-cell"><?= $this->h($player['title'] ?? 'None') ?></td>
-                            <td class="location-cell"><?= $this->h($player['location'] ?? 'Unknown') ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

@@ -31,19 +31,15 @@ footer{text-align:center;color:var(--muted);padding:28px}@media(max-width:760px)
 .online-players td:nth-child(5){color:var(--muted);white-space:nowrap}
 @media(max-width:760px){.icon-cell{width:52px}.wow-icon{width:24px;height:24px}.online-players td:nth-child(5){white-space:normal}}
 
-/* 在线玩家表格：固定列宽，保持种族/职业/等级/公会/头衔/位置等间距更稳定 */
+/* 在线玩家表格：只保留稳定可读取字段，列距均匀 */
 .online-players .table-wrap{overflow-x:auto}
-.online-players table{min-width:920px;table-layout:fixed;border-collapse:separate;border-spacing:0}
-.online-players th,.online-players td{padding:14px 18px;vertical-align:middle;white-space:nowrap}
-.online-players th:nth-child(1),.online-players td:nth-child(1){width:18%}
-.online-players th:nth-child(2),.online-players td:nth-child(2){width:10%;text-align:center}
-.online-players th:nth-child(3),.online-players td:nth-child(3){width:10%;text-align:center}
-.online-players th:nth-child(4),.online-players td:nth-child(4){width:9%;text-align:center}
-.online-players th:nth-child(5),.online-players td:nth-child(5){width:17%}
-.online-players th:nth-child(6),.online-players td:nth-child(6){width:18%}
-.online-players th:nth-child(7),.online-players td:nth-child(7){width:18%}
+.online-players table{min-width:560px;table-layout:fixed;border-collapse:separate;border-spacing:0}
+.online-players th,.online-players td{padding:15px 22px;vertical-align:middle;white-space:nowrap}
+.online-players th:nth-child(1),.online-players td:nth-child(1){width:40%}
+.online-players th:nth-child(2),.online-players td:nth-child(2){width:20%;text-align:center}
+.online-players th:nth-child(3),.online-players td:nth-child(3){width:20%;text-align:center}
+.online-players th:nth-child(4),.online-players td:nth-child(4){width:20%;text-align:center}
 .online-players .icon-cell{width:auto;text-align:center}
 .online-players .level-cell{font-weight:900;color:#fff;text-align:center}
-.online-players .guild-cell,.online-players .title-cell,.online-players .location-cell{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
-.online-players .title-cell{font-style:italic}
-@media(max-width:760px){.online-players table{min-width:860px}.online-players th,.online-players td{padding:12px 14px}.online-players .location-cell{white-space:nowrap}}
+.online-players .offline-row{color:#ff9c9c;font-weight:900;letter-spacing:.08em}
+@media(max-width:760px){.online-players table{min-width:520px}.online-players th,.online-players td{padding:12px 14px}}

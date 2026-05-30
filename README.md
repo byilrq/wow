@@ -140,3 +140,62 @@ sudo python3 wow.py
 - 云服务器安全组仍需要放行 TCP 80/443。
 - 使用 SRP6 时必须安装 `php-gmp`，部署脚本会自动安装。
 - Nginx 的 Web 根目录必须指向 `public`，不要直接暴露项目根目录。
+
+## 与 Hysteria 2 / 代理工具共存的本地反代模式
+
+如果服务器上已经有 Hysteria 2、Xray、Caddy 或其他代理工具占用了公网 `443`，不要让 WoW 注册站的 Nginx 再监听公网 `443`，否则会冲突，或者浏览器看到的仍然是代理工具配置里的伪装站。
+
+新版 `wow.py` 默认使用 `local_proxy` 模式：
+
+- WoW 注册站 Nginx 只监听 `127.0.0.1:8080`。
+- 公网 `443` 继续由你的代理工具监听。
+- 脚本会尝试把 `/etc/hysteria/config.yaml` 的 `masquerade.proxy.url` 改成 `http://127.0.0.1:8080`。
+- 浏览器访问 `https://你的域名/` 时，会由 Hysteria 的 masquerade 转发到本机 WoW 注册站。
+
+安装：
+
+```bash
+sudo python3 wow.py
+```
+
+明确指定本地反代模式：
+
+```bash
+WOW_BIND_MODE=local_proxy sudo -E python3 wow.py
+```
+
+如本机 8080 已占用：
+
+```bash
+LOCAL_HTTP_PORT=8081 WOW_BIND_MODE=local_proxy sudo -E python3 wow.py
+```
+
+如果你不想让脚本自动改 Hysteria 配置：
+
+```bash
+UPDATE_HYSTERIA_MASQUERADE=0 WOW_BIND_MODE=local_proxy sudo -E python3 wow.py
+```
+
+然后手动修改 `/etc/hysteria/config.yaml`：
+
+```yaml
+masquerade:
+  type: proxy
+  proxy:
+    url: http://127.0.0.1:8080
+    rewriteHost: false
+  listenHTTPS: :443
+```
+
+修改后重启：
+
+```bash
+systemctl restart hysteria-server || systemctl restart hysteria
+systemctl reload nginx
+```
+
+如果你没有代理工具占用 443，才建议使用传统 HTTPS 模式：
+
+```bash
+WOW_BIND_MODE=public_https sudo -E python3 wow.py
+```

@@ -117,3 +117,10 @@ footer{text-align:center;color:var(--muted);padding:28px}@media(max-width:760px)
   .header-wow-logo img{max-height:70px}
   .hero-with-register,.announcement-admin-grid{grid-template-columns:1fr}
 }
+
+
+/* 修复：抬头标志仅作为顶部小标志显示，不再占据页面主体 */
+.topbar{min-height:58px;padding-top:10px;padding-bottom:10px}
+.header-wow-logo{max-width:min(210px,36vw)}
+.header-wow-logo img{max-height:44px;width:auto;max-width:100%;object-fit:contain}
+@media(max-width:760px){.header-wow-logo{max-width:min(220px,72vw)}.header-wow-logo img{max-height:48px}}

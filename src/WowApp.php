@@ -1020,7 +1020,6 @@ final class WowApp
                 <div><span>核心</span><strong><?= $this->h($core) ?></strong></div>
                 <div><span>Realmlist</span><strong>set realmlist <?= $this->h($realmlist) ?></strong></div>
             </div>
-            <p class="server-desc">使用本站账号登录客户端；如需通过本 VPS 中转游戏流量，请保持 Nginx stream 转发 3724 / 8085 端口配置启用。</p>
             <p class="launcher-download-row"><span><?= $this->h($launcherLabel) ?></span><a class="launcher-icon-link" href="<?= $this->h($this->launcherUrl()) ?>" download aria-label="下载登陆器" title="下载登陆器"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.29V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg></a></p>
         </section>
         <?php return (string)ob_get_clean();

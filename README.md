@@ -1,13 +1,13 @@
 # 黑石 WoW 注册站
 
-这是一个面向私服魔兽世界的轻量注册站，采用新架构实现注册页、状态页、公告页，文件数量少，部署边界清晰。
+这是一个面向私服魔兽世界的轻量注册站，采用新架构实现注册页、首页在线状态、公告页，文件数量少，部署边界清晰。
 
 ## 结构
 
 ```text
 public/index.php          # 唯一 Web 入口
 public/assets/style.css   # 页面样式
-src/WowApp.php            # 注册、状态、公告、验证码、公告管理核心
+src/WowApp.php            # 注册、首页在线玩家、公告、验证码、公告管理核心
 config.php                # 保留原 WOW_Web 配置参数与中文注释
 storage/announcements.json# 公告数据
 wow.py                    # 只负责注册站安装和 Nginx 配置

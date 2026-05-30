@@ -792,7 +792,7 @@ final class WowApp
         ob_start(); ?>
         <section class="hero hero-compact">
             <div class="wlk-logo-wrap" aria-label="WLK">
-                <img class="wlk-logo" src="assets/wlk-logo.webp" alt="Wrath of the Lich King">
+                <img class="wlk-logo" src="assets/wlk-logo.png" alt="Wrath of the Lich King">
             </div>
             <div class="panel metric">
                 <span>服务器状态</span>

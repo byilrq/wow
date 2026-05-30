@@ -1,6 +1,7 @@
 server {
-    listen 80;
-    server_name sharq.eu.org;
+    listen 127.0.0.1:8080;
+    server_name _;
+
     root /www/wow/public;
     index index.php index.html;
 

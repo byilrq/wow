@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""WoW 注册站新架构一键部署脚本。
+"""黑石 WoW 注册站一键部署脚本。
 
-两种部署模式：
-1. local_proxy（默认）：WoW 网站只监听 127.0.0.1:8080，适合 Hysteria 2 / 代理工具占用公网 443。
-   浏览器访问 https://域名 时，先进入代理工具，再由 masquerade 反代到本机 WoW 网站。
-2. public_https：WoW 网站自己监听 80/443，并使用 certbot 申请证书。
+职责边界：
+- 本脚本只负责 WoW 注册站自身安装、源码更新、PHP-FPM、Nginx 配置。
+- 本脚本不会读取、修改或重启 Hysteria / Xray / Caddy 等代理工具。
+- 如果公网 443 已经由代理工具占用，请使用默认 local_proxy 模式，代理工具手动反代到 http://127.0.0.1:8080。
+
+部署模式：
+1. local_proxy（默认）：Nginx 只监听 127.0.0.1:8080，适合已有 Hysteria/代理工具占用公网 443。
+2. public_https：Nginx 监听公网 80/443，并由本脚本用 certbot 申请证书。
 
 常用：
   sudo python3 wow.py
@@ -15,11 +19,9 @@ from __future__ import annotations
 
 import os
 import platform
-import re
 import shutil
 import socket
 import subprocess
-from datetime import datetime
 from pathlib import Path
 
 DEFAULT_DOMAIN = os.environ.get("DEFAULT_DOMAIN", "sharq.eu.org")
@@ -30,12 +32,9 @@ REPO_URL = os.environ.get("REPO_URL", "https://github.com/byilrq/wow.git")
 REPO_BRANCH = os.environ.get("REPO_BRANCH", "main")
 DOMAIN_STATE_FILE = Path("/etc/wow_domain.conf")
 
-# local_proxy：Nginx 只服务给本机代理工具；public_https：Nginx 直接对公网提供 HTTPS。
 WOW_BIND_MODE = os.environ.get("WOW_BIND_MODE", "local_proxy").strip().lower()
 LOCAL_BIND_HOST = os.environ.get("LOCAL_BIND_HOST", "127.0.0.1")
 LOCAL_HTTP_PORT = int(os.environ.get("LOCAL_HTTP_PORT", "8080"))
-UPDATE_HYSTERIA_MASQUERADE = os.environ.get("UPDATE_HYSTERIA_MASQUERADE", "1") not in {"0", "false", "False", "no", "NO"}
-HYSTERIA_CONFIG = Path(os.environ.get("HYSTERIA_CONFIG", "/etc/hysteria/config.yaml"))
 
 
 def run(cmd: list[str] | str, check: bool = True, cwd: Path | None = None) -> subprocess.CompletedProcess:
@@ -98,7 +97,9 @@ def setup_php_repo() -> None:
 
 
 def open_firewall() -> None:
-    # local_proxy 模式下，公网 443 通常由代理工具负责；这里只做宽松放行，不绑定端口。
+    # local_proxy 模式只监听 127.0.0.1，不需要开放 8080；public_https 需要 80/443。
+    if WOW_BIND_MODE != "public_https":
+        return
     if shutil.which("ufw"):
         run(["ufw", "allow", "80/tcp"], check=False)
         run(["ufw", "allow", "443/tcp"], check=False)
@@ -120,6 +121,9 @@ def deploy_source() -> None:
     run(["rsync", "-a", "--delete", f"{tmp}/", f"{WEB_ROOT}/"])
     if not (WEB_ROOT / "public/index.php").exists():
         raise SystemExit("部署失败：仓库中没有 public/index.php，请确认 GitHub 仓库已上传新版程序包。")
+    (WEB_ROOT / "storage").mkdir(parents=True, exist_ok=True)
+    if not (WEB_ROOT / "storage/announcements.json").exists():
+        (WEB_ROOT / "storage/announcements.json").write_text("[]\n")
     run(["chown", "-R", "www-data:www-data", str(WEB_ROOT)], check=False)
 
 
@@ -129,17 +133,26 @@ def ensure_env(domain: str) -> None:
         sample = WEB_ROOT / ".env.example"
         shutil.copy(sample, env_path) if sample.exists() else env_path.write_text("")
 
-    public_url = os.environ.get("APP_URL", f"https://{domain}")
     replacements = {
-        "APP_URL": public_url,
+        "APP_URL": os.environ.get("APP_URL", f"https://{domain}"),
+        "APP_NAME": os.environ.get("APP_NAME", "黑石"),
         "REALMLIST": os.environ.get("REALMLIST", domain),
-        "APP_NAME": os.environ.get("APP_NAME", "BlackRock"),
-        "DB_AUTH_HOST": os.environ.get("DB_AUTH_HOST", "127.0.0.1"),
-        "DB_AUTH_PORT": os.environ.get("DB_AUTH_PORT", "3306"),
+        "DB_AUTH_HOST": os.environ.get("DB_AUTH_HOST", "byilrq.iok.la"),
+        "DB_AUTH_PORT": os.environ.get("DB_AUTH_PORT", "58006"),
         "DB_AUTH_DATABASE": os.environ.get("DB_AUTH_DATABASE", "acore_auth"),
         "DB_AUTH_USERNAME": os.environ.get("DB_AUTH_USERNAME", "admin"),
-        "DB_AUTH_PASSWORD": os.environ.get("DB_AUTH_PASSWORD", "change_me"),
+        "DB_AUTH_PASSWORD": os.environ.get("DB_AUTH_PASSWORD", "Plex0819$"),
+        "REALM_1_NAME": os.environ.get("REALM_1_NAME", "黑石"),
+        "REALM_1_HOST": os.environ.get("REALM_1_HOST", os.environ.get("DB_AUTH_HOST", "byilrq.iok.la")),
+        "REALM_1_PORT": os.environ.get("REALM_1_PORT", os.environ.get("DB_AUTH_PORT", "58006")),
         "REALM_1_DATABASE": os.environ.get("REALM_1_DATABASE", "acore_characters"),
+        "REALM_1_USERNAME": os.environ.get("REALM_1_USERNAME", os.environ.get("DB_AUTH_USERNAME", "admin")),
+        "REALM_1_PASSWORD": os.environ.get("REALM_1_PASSWORD", os.environ.get("DB_AUTH_PASSWORD", "Plex0819$")),
+        "CAPTCHA_TYPE": os.environ.get("CAPTCHA_TYPE", "1"),
+        "CAPTCHA_KEY": os.environ.get("CAPTCHA_KEY", "10b6462c-973a-458c-84f4-6c60794e2a78"),
+        "CAPTCHA_SECRET": os.environ.get("CAPTCHA_SECRET", "ES_9278a8805838434c9fa776e49af64355"),
+        "CAPTCHA_LANGUAGE": os.environ.get("CAPTCHA_LANGUAGE", "en"),
+        "ANNOUNCEMENT_PIN": os.environ.get("ANNOUNCEMENT_PIN", "0819"),
     }
 
     text = env_path.read_text()
@@ -174,8 +187,21 @@ def configure_php() -> None:
     run(["systemctl", "restart", f"php{PHP_VER}-fpm"], check=False)
 
 
+def enable_nginx_site() -> None:
+    sites_enabled = Path("/etc/nginx/sites-enabled")
+    sites_enabled.mkdir(exist_ok=True)
+    link = sites_enabled / "wow"
+    if link.exists() or link.is_symlink():
+        link.unlink()
+    link.symlink_to("/etc/nginx/sites-available/wow")
+    default = sites_enabled / "default"
+    if default.exists() or default.is_symlink():
+        default.unlink()
+    run(["nginx", "-t"])
+    run(["systemctl", "reload", "nginx"], check=False)
+
+
 def write_nginx_site_local(domain: str) -> None:
-    """只绑定 127.0.0.1，避免和 Hysteria/Caddy/Xray 等公网 443 服务冲突。"""
     Path("/etc/nginx/sites-available/wow").write_text(f"""
 server {{
     listen {LOCAL_BIND_HOST}:{LOCAL_HTTP_PORT};
@@ -260,20 +286,6 @@ server {{
     enable_nginx_site()
 
 
-def enable_nginx_site() -> None:
-    sites_enabled = Path("/etc/nginx/sites-enabled")
-    sites_enabled.mkdir(exist_ok=True)
-    link = sites_enabled / "wow"
-    if link.exists() or link.is_symlink():
-        link.unlink()
-    link.symlink_to("/etc/nginx/sites-available/wow")
-    default = sites_enabled / "default"
-    if default.exists() or default.is_symlink():
-        default.unlink()
-    run(["nginx", "-t"])
-    run(["systemctl", "reload", "nginx"], check=False)
-
-
 def obtain_cert(domain: str) -> None:
     live = Path(f"/etc/letsencrypt/live/{domain}/fullchain.pem")
     if live.exists():
@@ -286,46 +298,6 @@ def obtain_cert(domain: str) -> None:
     run(["certbot", "certonly", "--agree-tos", "-m", EMAIL, "--webroot", "-w", str(WEB_ROOT / "public"), "-d", domain])
 
 
-def restart_hysteria() -> None:
-    for service in ("hysteria-server", "hysteria"):
-        result = subprocess.run(["systemctl", "list-unit-files", f"{service}.service"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if result.returncode == 0:
-            run(["systemctl", "restart", service], check=False)
-            return
-    run(["systemctl", "restart", "hysteria-server"], check=False)
-
-
-def update_hysteria_masquerade() -> None:
-    if not UPDATE_HYSTERIA_MASQUERADE:
-        return
-    if not HYSTERIA_CONFIG.exists():
-        print(f"\n⚠️ 未找到 {HYSTERIA_CONFIG}，跳过 Hysteria 伪装站自动修改。")
-        print(f"请手动把代理工具的伪装/masquerade 目标改为：http://{LOCAL_BIND_HOST}:{LOCAL_HTTP_PORT}")
-        return
-
-    text = HYSTERIA_CONFIG.read_text()
-    backup = HYSTERIA_CONFIG.with_suffix(f".yaml.bak.{datetime.now().strftime('%Y%m%d%H%M%S')}")
-    shutil.copy2(HYSTERIA_CONFIG, backup)
-
-    block = f"""masquerade:
-  type: proxy
-  proxy:
-    url: http://{LOCAL_BIND_HOST}:{LOCAL_HTTP_PORT}
-    rewriteHost: false
-  listenHTTPS: :443
-"""
-    # 替换 masquerade 块；若不存在则追加到文件末尾。
-    pattern = re.compile(r"(?ms)^masquerade:\n(?:^[ \t].*\n?)*")
-    if pattern.search(text):
-        text = pattern.sub(block, text)
-    else:
-        text = text.rstrip() + "\n\n" + block
-    HYSTERIA_CONFIG.write_text(text)
-    print(f"\n✅ 已修改 Hysteria 伪装站：{HYSTERIA_CONFIG}")
-    print(f"   备份文件：{backup}")
-    restart_hysteria()
-
-
 def install(domain: str) -> None:
     mode = WOW_BIND_MODE
     if mode not in {"local_proxy", "public_https"}:
@@ -335,7 +307,7 @@ def install(domain: str) -> None:
     setup_php_repo()
     apt_install([
         f"php{PHP_VER}", f"php{PHP_VER}-cli", f"php{PHP_VER}-fpm", f"php{PHP_VER}-mysql",
-        f"php{PHP_VER}-gmp", f"php{PHP_VER}-curl", f"php{PHP_VER}-mbstring", f"php{PHP_VER}-xml", f"php{PHP_VER}-zip",
+        f"php{PHP_VER}-gmp", f"php{PHP_VER}-curl", f"php{PHP_VER}-mbstring", f"php{PHP_VER}-xml", f"php{PHP_VER}-zip", f"php{PHP_VER}-soap",
     ])
     run(["systemctl", "enable", "nginx", f"php{PHP_VER}-fpm"], check=False)
     open_firewall()
@@ -347,11 +319,10 @@ def install(domain: str) -> None:
         if tcp_port_is_busy(LOCAL_BIND_HOST, LOCAL_HTTP_PORT):
             print(f"\n⚠️ {LOCAL_BIND_HOST}:{LOCAL_HTTP_PORT} 已有服务监听，Nginx reload 可能失败。可用 LOCAL_HTTP_PORT=8081 改端口。")
         write_nginx_site_local(domain)
-        update_hysteria_masquerade()
         print("\n✅ 安装完成：local_proxy 模式")
         print(f"本机测试地址：http://{LOCAL_BIND_HOST}:{LOCAL_HTTP_PORT}/")
-        print(f"公网访问地址：https://{domain}/")
-        print(f"代理工具伪装目标：http://{LOCAL_BIND_HOST}:{LOCAL_HTTP_PORT}")
+        print(f"公网访问地址通常由你的代理工具提供：https://{domain}/")
+        print(f"如果使用 Hysteria/Xray/Caddy 伪装站，请手动把反代目标设置为：http://{LOCAL_BIND_HOST}:{LOCAL_HTTP_PORT}")
     else:
         write_nginx_site_http(domain)
         obtain_cert(domain)
@@ -369,13 +340,14 @@ def change_domain() -> None:
     ensure_env(new)
     if WOW_BIND_MODE == "local_proxy":
         write_nginx_site_local(new)
-        update_hysteria_masquerade()
+        print(f"✅ 域名已修改：{old} -> {new}")
+        print(f"提醒：本脚本不会修改代理工具配置，请手动把伪装站/反代目标保持为 http://{LOCAL_BIND_HOST}:{LOCAL_HTTP_PORT}")
     else:
         write_nginx_site_http(new)
         obtain_cert(new)
         write_nginx_site_https(new)
+        print(f"✅ 域名已修改：{old} -> {new}")
     save_domain(new)
-    print(f"✅ 域名已修改：{old} -> {new}")
 
 
 def renew_cert() -> None:
@@ -392,16 +364,16 @@ def menu() -> None:
     require_root()
     print(f"""
 ==========================================
- WoW 新架构注册站管理菜单
+ 黑石 WoW 注册站管理菜单
  当前记录域名：{get_saved_domain()}
  站点目录：{WEB_ROOT}
  GitHub：{REPO_URL}
  模式：{WOW_BIND_MODE}
  本地监听：{LOCAL_BIND_HOST}:{LOCAL_HTTP_PORT}
 ==========================================
-1) 一键安装
+1) 一键安装 / 更新
 2) 修改域名
-3) 更新证书
+3) 更新证书（仅 public_https 模式）
 0) 退出
 """)
     choice = input("请输入选项编号：").strip()

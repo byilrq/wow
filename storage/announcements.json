@@ -1,13 +1,15 @@
 [
   {
-    "title": "欢迎来到 BlackRock",
-    "date": "2026-05-30",
+    "id": "welcome-blackrock",
+    "title": "欢迎来到黑石",
+    "date": "2026-05-30 00:00",
     "level": "important",
     "content": "注册站已经切换为新架构：注册、状态、公告集中在一个轻量程序内。"
   },
   {
+    "id": "client-version-335a",
     "title": "客户端版本",
-    "date": "2026-05-30",
+    "date": "2026-05-30 00:00",
     "level": "normal",
     "content": "当前推荐客户端版本为 3.3.5a (12340)，请将 realmlist 设置为本站首页显示的地址。"
   }

@@ -783,15 +783,20 @@ final class WowApp
     private function pageHome(): string
     {
         $status = $this->status();
+        $realmName = $this->firstRealmName();
         ob_start(); ?>
-        <section class="hero hero-compact hero-with-register">
-            <?= $this->serverInfoCard('panel hero-server-panel') ?>
-            <div class="panel hero-register-panel">
-                <h2>账号注册</h2>
-                <?= $this->compactRegisterForm() ?>
+        <section class="hero hero-compact">
+            <div class="wlk-logo-wrap" aria-label="WLK">
+                <img class="wlk-logo" src="assets/wlk-logo.png" alt="Wrath of the Lich King">
+            </div>
+            <div class="panel metric">
+                <span>服务器状态</span>
+                <strong><?= (int)$status['total_online'] ?></strong>
+                <small><?= $this->h($this->cfg('game_version')) ?></small>
             </div>
         </section>
-        <section class="grid one latest-announcement-row">
+        <section class="grid two">
+            <div class="card"><h2>服务器信息</h2><p>服务器：<?= $this->h($realmName) ?></p><p>版本：<?= $this->h($this->cfg('game_version')) ?></p><p class="launcher-download-row"><span>登陆器下载</span><a class="launcher-icon-link" href="<?= $this->h($this->launcherUrl()) ?>" download aria-label="下载登陆器" title="下载登陆器"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.29V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg></a></p></div>
             <div class="card"><h2>最新公告</h2><?= $this->announcementList(2, false) ?></div>
         </section>
         <?= $this->onlinePlayersTable($status) ?>
@@ -813,23 +818,31 @@ final class WowApp
                     <span class="badge <?= $totalOnline > 0 ? 'ok' : 'bad' ?>"><?= $totalOnline > 0 ? '在线' : '离线' ?></span>
                 </div>
             </div>
-            <div class="table-wrap status-player-panel">
-                <table>
-                    <thead><tr><th>角色</th><th>种族</th><th>职业</th><th>等级</th></tr></thead>
-                    <tbody>
-                    <?php if (!$players): ?>
-                        <tr><td colspan="4" class="empty-row offline-row">服务器离线！</td></tr>
-                    <?php endif; ?>
-                    <?php foreach ($players as $player): ?>
-                        <tr>
-                            <td><?= $this->h($player['name'] ?? '') ?></td>
-                            <td class="icon-cell"><?= $this->iconImg($player['race_icon'] ?? null, (string)($player['race'] ?? '未知种族')) ?></td>
-                            <td class="icon-cell"><?= $this->iconImg($player['class_icon'] ?? null, (string)($player['class'] ?? '未知职业')) ?></td>
-                            <td class="level-cell"><?= (int)($player['level'] ?? 0) ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                    </tbody>
-                </table>
+            <div class="status-content-grid">
+                <aside class="status-register-panel">
+                    <h3>账号注册</h3>
+                    <?= $this->compactRegisterForm() ?>
+                </aside>
+                <div class="status-player-panel">
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>角色</th><th>种族</th><th>职业</th><th>等级</th></tr></thead>
+                            <tbody>
+                            <?php if (!$players): ?>
+                                <tr><td colspan="4" class="empty-row offline-row">服务器离线！</td></tr>
+                            <?php endif; ?>
+                            <?php foreach ($players as $player): ?>
+                                <tr>
+                                    <td><?= $this->h($player['name'] ?? '') ?></td>
+                                    <td class="icon-cell"><?= $this->iconImg($player['race_icon'] ?? null, (string)($player['race'] ?? '未知种族')) ?></td>
+                                    <td class="icon-cell"><?= $this->iconImg($player['class_icon'] ?? null, (string)($player['class'] ?? '未知职业')) ?></td>
+                                    <td class="level-cell"><?= (int)($player['level'] ?? 0) ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </section>
         <?php return (string)ob_get_clean();
@@ -946,20 +959,17 @@ final class WowApp
     {
         ob_start(); ?>
         <section class="page-head"><h1>公告</h1><p>服务器维护、活动、版本说明都会显示在这里。</p></section>
-        <section class="grid two announcement-admin-grid">
-            <?= $this->serverInfoCard('card server-info-card') ?>
-            <section class="card form-card">
-                <h2>发布公告</h2>
-                <form method="post" action="?page=announcements" onsubmit="return fillPin(this)">
-                    <input type="hidden" name="csrf" value="<?= $this->h($this->csrf()) ?>">
-                    <input type="hidden" name="action" value="add_announcement">
-                    <input type="hidden" name="pin" value="">
-                    <label>标题<input name="title" required maxlength="80" placeholder="例如：周末活动开启"></label>
-                    <label>类型<select name="level"><option value="normal">普通</option><option value="important">重要</option><option value="maintenance">维护</option></select></label>
-                    <label>内容<textarea name="content" required rows="4" placeholder="请输入公告内容"></textarea></label>
-                    <button class="btn primary" type="submit">添加公告</button>
-                </form>
-            </section>
+        <section class="card form-card">
+            <h2>发布公告</h2>
+            <form method="post" action="?page=announcements" onsubmit="return fillPin(this)">
+                <input type="hidden" name="csrf" value="<?= $this->h($this->csrf()) ?>">
+                <input type="hidden" name="action" value="add_announcement">
+                <input type="hidden" name="pin" value="">
+                <label>标题<input name="title" required maxlength="80" placeholder="例如：周末活动开启"></label>
+                <label>类型<select name="level"><option value="normal">普通</option><option value="important">重要</option><option value="maintenance">维护</option></select></label>
+                <label>内容<textarea name="content" required rows="4" placeholder="请输入公告内容"></textarea></label>
+                <button class="btn primary" type="submit">添加公告</button>
+            </form>
         </section>
         <section class="card announcements"><h2>公告列表</h2><?= $this->announcementList(null, true) ?></section>
         <script>
@@ -1002,57 +1012,6 @@ final class WowApp
         return (string)ob_get_clean();
     }
 
-    private function serverInfoCard(string $class = 'card server-info-card'): string
-    {
-        $realmName = $this->firstRealmName();
-        $realmlist = (string)$this->cfg('realmlist', '');
-        $gameVersion = (string)$this->cfg('game_version', '');
-        $expansion = $this->expansionLabel((string)$this->cfg('expansion', '2'));
-        $core = $this->serverCoreLabel((int)$this->cfg('server_core', 1));
-        $launcherLabel = (string)$this->cfg('launcher_label', '登陆器下载');
-        ob_start(); ?>
-        <section class="<?= $this->h($class) ?>">
-            <h2>服务器信息</h2>
-            <div class="server-info-list">
-                <div><span>服务器</span><strong><?= $this->h($realmName) ?></strong></div>
-                <div><span>游戏版本</span><strong><?= $this->h($gameVersion) ?></strong></div>
-                <div><span>资料片</span><strong><?= $this->h($expansion) ?></strong></div>
-                <div><span>核心</span><strong><?= $this->h($core) ?></strong></div>
-                <div><span>Realmlist</span><strong>set realmlist <?= $this->h($realmlist) ?></strong></div>
-            </div>
-            <p class="launcher-download-row"><span><?= $this->h($launcherLabel) ?></span><a class="launcher-icon-link" href="<?= $this->h($this->launcherUrl()) ?>" download aria-label="下载登陆器" title="下载登陆器"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.29V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg></a></p>
-        </section>
-        <?php return (string)ob_get_clean();
-    }
-
-    private function expansionLabel(string $id): string
-    {
-        $map = [
-            '0' => '经典旧世 (Classic)',
-            '1' => '燃烧的远征 (TBC)',
-            '2' => '巫妖王之怒 (WotLK)',
-            '3' => '大地的裂变 (Cataclysm)',
-            '4' => '熊猫人之谜 (MOP)',
-            '5' => '德拉诺之王 (WOD)',
-            '6' => '军团再临 (Legion)',
-            '7' => '争霸艾泽拉斯 (BFA)',
-        ];
-        return $map[$id] ?? ('资料片 ' . $id);
-    }
-
-    private function serverCoreLabel(int $id): string
-    {
-        $map = [
-            0 => 'TrinityCore',
-            1 => 'AzerothCore',
-            2 => 'AshamaneCore',
-            3 => 'Skyfire Project',
-            4 => 'OregonCore',
-            5 => 'CMangos',
-        ];
-        return $map[$id] ?? ('Core ' . $id);
-    }
-
     private function firstRealmName(): string
     {
         $realms = $this->cfg('realmlists', []);
@@ -1069,7 +1028,7 @@ final class WowApp
             <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
             <title><?= $title ?></title><link rel="stylesheet" href="assets/style.css">
         </head><body>
-        <header class="topbar"><a class="brand" href="?page=home"><?= $title ?></a><a class="header-wow-logo" href="?page=home" aria-label="返回首页"><img src="assets/wlk-logo.png" alt="Wrath of the Lich King"></a><nav>
+        <header class="topbar"><a class="brand" href="?page=home"><?= $title ?></a><nav>
             <?php foreach ($nav as $key => $label): ?><a class="<?= $page === $key ? 'active' : '' ?>" href="?page=<?= $key ?>"><?= $label ?></a><?php endforeach; ?>
         </nav></header>
         <main>

@@ -470,7 +470,7 @@ final class WowApp
 
     private function statusCachePath(): string
     {
-        return dirname(__DIR__) . '/storage/status-cache.json';
+        return dirname(__DIR__) . '/storage/status-cache-v2.json';
     }
 
     private function readStatusCache(int $ttl): ?array
@@ -509,21 +509,34 @@ final class WowApp
     {
         $limit = max(1, min(49, $limit));
         $hasGender = $this->columnExistsIn($db, 'characters', 'gender');
+        $hasGuid = $this->columnExistsIn($db, 'characters', 'guid');
         $hasMap = $this->columnExistsIn($db, 'characters', 'map');
         $hasZone = $this->columnExistsIn($db, 'characters', 'zone');
+        $hasChosenTitle = $this->columnExistsIn($db, 'characters', 'chosenTitle');
+        $hasGuildTables = $hasGuid && $this->tableExistsIn($db, 'guild_member') && $this->tableExistsIn($db, 'guild');
 
-        $columns = ['name', 'race', 'class', 'level'];
+        $columns = ['c.name', 'c.race', 'c.class', 'c.level'];
         if ($hasGender) {
-            $columns[] = 'gender';
+            $columns[] = 'c.gender';
         }
         if ($hasMap) {
-            $columns[] = 'map';
+            $columns[] = 'c.map';
         }
         if ($hasZone) {
-            $columns[] = 'zone';
+            $columns[] = 'c.zone';
+        }
+        if ($hasChosenTitle) {
+            $columns[] = 'c.chosenTitle';
+        }
+        if ($hasGuildTables) {
+            $columns[] = 'g.name AS guild_name';
         }
 
-        $sql = 'SELECT ' . implode(', ', $columns) . " FROM characters WHERE online = 1 ORDER BY level DESC, name ASC LIMIT {$limit}";
+        $sql = 'SELECT ' . implode(', ', $columns) . ' FROM characters c ';
+        if ($hasGuildTables) {
+            $sql .= 'LEFT JOIN guild_member gm ON gm.guid = c.guid LEFT JOIN guild g ON g.guildid = gm.guildid ';
+        }
+        $sql .= "WHERE c.online = 1 ORDER BY c.level DESC, c.name ASC LIMIT {$limit}";
         $players = [];
         foreach ($db->query($sql) as $row) {
             $race = (int)($row['race'] ?? 0);
@@ -541,6 +554,9 @@ final class WowApp
                 'class' => $this->className($class),
                 'class_icon' => $this->classIconUrl($class),
                 'level' => (int)($row['level'] ?? 0),
+                'guild' => (string)($row['guild_name'] ?? ''),
+                'title_id' => isset($row['chosenTitle']) ? (int)$row['chosenTitle'] : 0,
+                'title' => $this->titleName(isset($row['chosenTitle']) ? (int)$row['chosenTitle'] : 0),
                 'map' => $map,
                 'zone' => $zone,
                 'location' => $this->locationName($map, $zone),
@@ -560,6 +576,22 @@ final class WowApp
         try {
             $stmt = $db->prepare('SHOW COLUMNS FROM ' . $this->safeName($table) . ' LIKE :column');
             $stmt->execute([':column' => $column]);
+            return $cache[$key] = (bool)$stmt->fetch();
+        } catch (Throwable) {
+            return $cache[$key] = false;
+        }
+    }
+
+    private function tableExistsIn(PDO $db, string $table): bool
+    {
+        static $cache = [];
+        $key = spl_object_id($db) . ':' . $table;
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
+        }
+        try {
+            $stmt = $db->prepare('SHOW TABLES LIKE :table_name');
+            $stmt->execute([':table_name' => $table]);
             return $cache[$key] = (bool)$stmt->fetch();
         } catch (Throwable) {
             return $cache[$key] = false;
@@ -629,55 +661,99 @@ final class WowApp
         ][$class] ?? '未知';
     }
 
+    private function titleName(int $titleId): string
+    {
+        if ($titleId <= 0) {
+            return 'None';
+        }
+        $titles = [
+            1 => 'Private', 2 => 'Corporal', 3 => 'Sergeant', 4 => 'Master Sergeant', 5 => 'Sergeant Major',
+            6 => 'Knight', 7 => 'Knight-Lieutenant', 8 => 'Knight-Captain', 9 => 'Knight-Champion', 10 => 'Lieutenant Commander',
+            11 => 'Commander', 12 => 'Marshal', 13 => 'Field Marshal', 14 => 'Grand Marshal', 15 => 'Scout', 16 => 'Grunt',
+            17 => 'Sergeant', 18 => 'Senior Sergeant', 19 => 'First Sergeant', 20 => 'Stone Guard', 21 => 'Blood Guard',
+            22 => 'Legionnaire', 23 => 'Centurion', 24 => 'Champion', 25 => 'Lieutenant General', 26 => 'General',
+            27 => 'Warlord', 28 => 'High Warlord', 42 => 'Scarab Lord', 45 => 'Champion of the Naaru', 46 => 'Merciless Gladiator',
+            47 => 'of the Shattered Sun', 48 => 'Hand of A\'dal', 53 => 'Vengeful Gladiator', 62 => 'Conqueror', 63 => 'Justicar',
+            64 => 'Flame Warden', 65 => 'Flame Keeper', 71 => 'Elder', 72 => 'Loremaster', 74 => 'of the Alliance', 75 => 'of the Horde',
+            77 => 'the Flawless Victor', 78 => 'Champion of the Frozen Wastes', 79 => 'Ambassador', 80 => 'the Argent Champion',
+            81 => 'Guardian of Cenarius', 82 => 'Brewmaster', 83 => 'Merrymaker', 84 => 'the Love Fool', 85 => 'Matron', 86 => 'Patron',
+            87 => 'Obsidian Slayer', 89 => 'of the Nightfall', 90 => 'the Immortal', 91 => 'the Undying', 92 => 'Jenkins',
+            93 => 'Bloodsail Admiral', 94 => 'the Insane', 95 => 'of the Exodar', 96 => 'of Darnassus', 97 => 'of Ironforge',
+            98 => 'of Stormwind', 99 => 'of Orgrimmar', 100 => 'of Sen\'jin', 101 => 'of Silvermoon', 102 => 'of Thunder Bluff',
+            103 => 'of the Undercity', 104 => 'the Magic Seeker', 105 => 'Twilight Vanquisher', 106 => 'Conqueror of Naxxramas',
+            107 => 'Hero of Northrend', 108 => 'the Hallowed', 109 => 'Loremaster', 110 => 'of the Alliance', 111 => 'of the Horde',
+            112 => 'the Flawless Victor', 113 => 'Champion of the Frozen Wastes', 114 => 'Ambassador', 115 => 'the Argent Champion',
+            116 => 'Guardian of Cenarius', 117 => 'Brewmaster', 118 => 'Merrymaker', 119 => 'the Love Fool', 120 => 'Matron',
+            121 => 'Patron', 122 => 'Obsidian Slayer', 123 => 'of the Nightfall', 124 => 'the Immortal', 125 => 'the Undying',
+            126 => 'Jenkins', 127 => 'Bloodsail Admiral', 128 => 'the Insane', 129 => 'of the Exodar', 130 => 'of Darnassus',
+            131 => 'of Ironforge', 132 => 'of Stormwind', 133 => 'of Orgrimmar', 134 => 'of Sen\'jin', 135 => 'of Silvermoon',
+            136 => 'of Thunder Bluff', 137 => 'of the Undercity', 138 => 'the Magic Seeker', 139 => 'Twilight Vanquisher',
+            140 => 'Conqueror of Naxxramas', 141 => 'Hero of Northrend', 142 => 'the Hallowed', 143 => 'the Seeker', 144 => 'Starcaller',
+            145 => 'the Astral Walker', 146 => 'Herald of the Titans', 147 => 'Furious Gladiator', 148 => 'the Pilgrim',
+            149 => 'Relentless Gladiator', 150 => 'Grand Crusader', 151 => 'the Argent Defender', 152 => 'the Patient',
+            153 => 'the Light of Dawn', 154 => 'Bane of the Fallen King', 155 => 'the Kingslayer', 156 => 'of the Ashen Verdict',
+            157 => 'Wrathful Gladiator', 158 => 'the Astral Walker', 159 => 'the Light of Dawn', 160 => 'Bane of the Fallen King',
+        ];
+        return $titles[$titleId] ?? ('Title #' . $titleId);
+    }
+
     private function locationName(?int $map, ?int $zone = null): string
     {
         $zones = [
-            1 => '丹莫罗', 3 => '荒芜之地', 4 => '诅咒之地', 8 => '悲伤沼泽', 10 => '暮色森林', 11 => '湿地',
-            12 => '艾尔文森林', 14 => '杜隆塔尔', 15 => '尘泥沼泽', 16 => '艾萨拉', 17 => '贫瘠之地', 28 => '西瘟疫之地',
-            33 => '荆棘谷', 36 => '奥特兰克山脉', 38 => '洛克莫丹', 40 => '西部荒野', 41 => '逆风小径', 44 => '赤脊山',
-            45 => '阿拉希高地', 46 => '燃烧平原', 47 => '辛特兰', 51 => '灼热峡谷', 85 => '提瑞斯法林地', 130 => '银松森林',
-            139 => '东瘟疫之地', 141 => '泰达希尔', 148 => '黑海岸', 215 => '莫高雷', 267 => '希尔斯布莱德丘陵', 331 => '灰谷',
-            357 => '菲拉斯', 361 => '费伍德森林', 400 => '千针石林', 405 => '凄凉之地', 406 => '石爪山脉', 440 => '塔纳利斯',
-            490 => '安戈洛环形山', 493 => '月光林地', 618 => '冬泉谷', 1377 => '希利苏斯', 1497 => '幽暗城', 1519 => '暴风城',
-            1537 => '铁炉堡', 1637 => '奥格瑞玛', 1638 => '雷霆崖', 1657 => '达纳苏斯', 3430 => '永歌森林', 3433 => '幽魂之地',
-            3483 => '地狱火半岛', 3487 => '银月城', 3518 => '纳格兰', 3519 => '泰罗卡森林', 3520 => '影月谷', 3521 => '赞加沼泽',
-            3522 => '刀锋山', 3523 => '虚空风暴', 3524 => '秘蓝岛', 3525 => '秘血岛', 3537 => '北风苔原', 3557 => '埃索达',
-            3703 => '沙塔斯城', 3711 => '索拉查盆地', 4080 => '奎尔丹纳斯岛', 4197 => '冬拥湖', 4298 => '血色领地',
-            4395 => '达拉然', 65 => '龙骨荒野', 66 => '祖达克', 67 => '风暴峭壁', 210 => '冰冠冰川', 394 => '灰熊丘陵',
-            495 => '嚎风峡湾', 2817 => '晶歌森林', 4100 => '净化斯坦索姆', 4264 => '岩石大厅', 4265 => '闪电大厅', 4273 => '奥杜尔',
-            4494 => '安卡赫特：古代王国', 4722 => '十字军的试炼', 4812 => '冰冠堡垒',
+            1 => 'Dun Morogh', 3 => 'Badlands', 4 => 'Blasted Lands', 8 => 'Swamp of Sorrows', 10 => 'Duskwood', 11 => 'Wetlands',
+            12 => 'Elwynn Forest', 14 => 'Durotar', 15 => 'Dustwallow Marsh', 16 => 'Azshara', 17 => 'The Barrens', 28 => 'Western Plaguelands',
+            33 => 'Stranglethorn Vale', 36 => 'Alterac Mountains', 38 => 'Loch Modan', 40 => 'Westfall', 41 => 'Deadwind Pass', 44 => 'Redridge Mountains',
+            45 => 'Arathi Highlands', 46 => 'Burning Steppes', 47 => 'The Hinterlands', 51 => 'Searing Gorge', 85 => 'Tirisfal Glades', 130 => 'Silverpine Forest',
+            139 => 'Eastern Plaguelands', 141 => 'Teldrassil', 148 => 'Darkshore', 215 => 'Mulgore', 267 => 'Hillsbrad Foothills', 331 => 'Ashenvale',
+            357 => 'Feralas', 361 => 'Felwood', 400 => 'Thousand Needles', 405 => 'Desolace', 406 => 'Stonetalon Mountains', 440 => 'Tanaris',
+            490 => 'Un\'Goro Crater', 493 => 'Moonglade', 618 => 'Winterspring', 1377 => 'Silithus', 1497 => 'Undercity', 1519 => 'Stormwind City',
+            1537 => 'Ironforge', 1637 => 'Orgrimmar', 1638 => 'Thunder Bluff', 1657 => 'Darnassus', 3430 => 'Eversong Woods', 3433 => 'Ghostlands',
+            3483 => 'Hellfire Peninsula', 3487 => 'Silvermoon City', 3518 => 'Nagrand', 3519 => 'Terokkar Forest', 3520 => 'Shadowmoon Valley',
+            3521 => 'Zangarmarsh', 3522 => 'Blade\'s Edge Mountains', 3523 => 'Netherstorm', 3524 => 'Azuremyst Isle', 3525 => 'Bloodmyst Isle',
+            3537 => 'Borean Tundra', 3557 => 'The Exodar', 3703 => 'Shattrath City', 3711 => 'Sholazar Basin', 4080 => 'Isle of Quel\'Danas',
+            4197 => 'Wintergrasp', 4298 => 'The Scarlet Enclave', 4395 => 'Dalaran', 65 => 'Dragonblight', 66 => 'Zul\'Drak',
+            67 => 'The Storm Peaks', 210 => 'Icecrown', 394 => 'Grizzly Hills', 495 => 'Howling Fjord', 2817 => 'Crystalsong Forest',
+            4100 => 'The Culling of Stratholme', 4264 => 'Halls of Stone', 4265 => 'Halls of Lightning', 4273 => 'Ulduar',
+            4494 => 'Ahn\'kahet: The Old Kingdom', 4722 => 'Trial of the Crusader', 4812 => 'Icecrown Citadel',
         ];
-        if ($zone !== null && isset($zones[$zone])) {
+        if ($zone !== null && $zone > 0 && isset($zones[$zone])) {
             return $zones[$zone];
         }
 
         $maps = [
-            0 => '东部王国', 1 => '卡利姆多', 30 => '奥特兰克山谷', 33 => '影牙城堡', 34 => '暴风城监狱', 36 => '死亡矿井',
-            43 => '哀嚎洞穴', 47 => '剃刀沼泽', 48 => '黑暗深渊', 70 => '奥达曼', 90 => '诺莫瑞根', 109 => '沉没的神庙',
-            129 => '剃刀高地', 189 => '血色修道院', 209 => '祖尔法拉克', 229 => '黑石塔', 230 => '黑石深渊', 249 => '奥妮克希亚的巢穴',
-            269 => '开启黑暗之门', 289 => '通灵学院', 309 => '祖尔格拉布', 329 => '斯坦索姆', 349 => '玛拉顿', 369 => '矿道地铁',
-            409 => '熔火之心', 429 => '厄运之槌', 469 => '黑翼之巢', 489 => '战歌峡谷', 529 => '阿拉希盆地', 530 => '外域',
-            531 => '安其拉神殿', 532 => '卡拉赞', 533 => '纳克萨玛斯', 534 => '海加尔山之战', 540 => '地狱火城墙', 542 => '鲜血熔炉',
-            543 => '破碎大厅', 544 => '玛瑟里顿的巢穴', 545 => '蒸汽地窟', 546 => '幽暗沼泽', 547 => '奴隶围栏', 548 => '毒蛇神殿',
-            550 => '风暴要塞', 552 => '禁魔监狱', 553 => '生态船', 554 => '能源舰', 555 => '暗影迷宫', 556 => '塞泰克大厅',
-            557 => '法力陵墓', 558 => '奥金尼地穴', 560 => '旧希尔斯布莱德丘陵', 562 => '刀锋山竞技场', 564 => '黑暗神殿', 565 => '格鲁尔的巢穴',
-            566 => '风暴之眼', 568 => '祖阿曼', 571 => '诺森德', 572 => '洛丹伦废墟', 574 => '乌特加德城堡', 575 => '乌特加德之巅',
-            576 => '魔枢', 578 => '魔环', 580 => '太阳之井高地', 585 => '魔导师平台', 595 => '净化斯坦索姆', 598 => '太阳之井高地',
-            599 => '岩石大厅', 600 => '达克萨隆要塞', 601 => '艾卓-尼鲁布', 602 => '闪电大厅', 603 => '奥杜尔', 604 => '古达克',
-            608 => '紫罗兰监狱', 615 => '黑曜石圣殿', 616 => '永恒之眼', 617 => '达拉然下水道', 618 => '勇气竞技场', 619 => '安卡赫特：古代王国',
-            624 => '阿尔卡冯的宝库', 628 => '征服之岛', 631 => '冰冠堡垒', 632 => '灵魂洪炉', 649 => '十字军的试炼', 650 => '冠军的试炼',
-            658 => '萨隆矿坑', 668 => '映像大厅', 724 => '红玉圣殿',
+            0 => 'Eastern Kingdoms', 1 => 'Kalimdor', 30 => 'Alterac Valley', 33 => 'Shadowfang Keep', 34 => 'Stormwind Stockade',
+            36 => 'Deadmines', 43 => 'Wailing Caverns', 47 => 'Razorfen Kraul', 48 => 'Blackfathom Deeps', 70 => 'Uldaman',
+            90 => 'Gnomeregan', 109 => 'Sunken Temple', 129 => 'Razorfen Downs', 189 => 'Scarlet Monastery', 209 => 'Zul\'Farrak',
+            229 => 'Blackrock Spire', 230 => 'Blackrock Depths', 249 => 'Onyxia\'s Lair', 269 => 'Opening of the Dark Portal',
+            289 => 'Scholomance', 309 => 'Zul\'Gurub', 329 => 'Stratholme', 349 => 'Maraudon', 369 => 'Deeprun Tram',
+            409 => 'Molten Core', 429 => 'Dire Maul', 469 => 'Blackwing Lair', 489 => 'Warsong Gulch', 529 => 'Arathi Basin',
+            530 => 'Outland', 531 => 'Temple of Ahn\'Qiraj', 532 => 'Karazhan', 533 => 'Naxxramas', 534 => 'Hyjal Summit',
+            540 => 'Hellfire Ramparts', 542 => 'The Blood Furnace', 543 => 'The Shattered Halls', 544 => 'Magtheridon\'s Lair',
+            545 => 'The Steamvault', 546 => 'The Underbog', 547 => 'The Slave Pens', 548 => 'Serpentshrine Cavern',
+            550 => 'Tempest Keep', 552 => 'The Arcatraz', 553 => 'The Botanica', 554 => 'The Mechanar', 555 => 'Shadow Labyrinth',
+            556 => 'Sethekk Halls', 557 => 'Mana-Tombs', 558 => 'Auchenai Crypts', 560 => 'Old Hillsbrad Foothills',
+            562 => 'Blade\'s Edge Arena', 564 => 'Black Temple', 565 => 'Gruul\'s Lair', 566 => 'Eye of the Storm', 568 => 'Zul\'Aman',
+            571 => 'Northrend', 572 => 'Ruins of Lordaeron', 574 => 'Utgarde Keep', 575 => 'Utgarde Pinnacle', 576 => 'The Nexus',
+            578 => 'The Oculus', 580 => 'Sunwell Plateau', 585 => 'Magisters\' Terrace', 595 => 'The Culling of Stratholme',
+            599 => 'Halls of Stone', 600 => 'Drak\'Tharon Keep', 601 => 'Azjol-Nerub', 602 => 'Halls of Lightning', 603 => 'Ulduar',
+            604 => 'Gundrak', 608 => 'The Violet Hold', 615 => 'The Obsidian Sanctum', 616 => 'The Eye of Eternity',
+            617 => 'Dalaran Sewers', 618 => 'Ring of Valor', 619 => 'Ahn\'kahet: The Old Kingdom', 624 => 'Vault of Archavon',
+            628 => 'Isle of Conquest', 631 => 'Icecrown Citadel', 632 => 'The Forge of Souls', 649 => 'Trial of the Crusader',
+            650 => 'Trial of the Champion', 658 => 'Pit of Saron', 668 => 'Halls of Reflection', 724 => 'The Ruby Sanctum',
         ];
-        if ($map !== null && isset($maps[$map])) {
+        if ($map !== null && $map >= 0 && isset($maps[$map])) {
+            if ($zone !== null && $zone > 0) {
+                return $maps[$map] . ' / Zone ' . $zone;
+            }
             return $maps[$map];
         }
         if ($zone !== null && $zone > 0) {
-            return '区域ID: ' . $zone;
+            return 'Zone ' . $zone;
         }
         if ($map !== null && $map >= 0) {
-            return '地图ID: ' . $map;
+            return 'Map ' . $map;
         }
-        return '未知位置';
+        return 'Unknown';
     }
 
     private function announcements(): array
@@ -788,18 +864,20 @@ final class WowApp
             </div>
             <div class="table-wrap">
                 <table>
-                    <thead><tr><th>角色</th><th>种族</th><th>职业</th><th>等级</th><th>地图位置</th></tr></thead>
+                    <thead><tr><th>角色</th><th>种族</th><th>职业</th><th>等级</th><th>公会</th><th>头衔</th><th>地图位置</th></tr></thead>
                     <tbody>
                     <?php if (!$players): ?>
-                        <tr><td colspan="5" class="empty-row">当前没有在线玩家，或角色数据库暂时无法读取。</td></tr>
+                        <tr><td colspan="7" class="empty-row">当前没有在线玩家，或角色数据库暂时无法读取。</td></tr>
                     <?php endif; ?>
                     <?php foreach ($players as $player): ?>
                         <tr>
                             <td><?= $this->h($player['name'] ?? '') ?></td>
                             <td class="icon-cell"><?= $this->iconImg($player['race_icon'] ?? null, (string)($player['race'] ?? '未知种族')) ?></td>
                             <td class="icon-cell"><?= $this->iconImg($player['class_icon'] ?? null, (string)($player['class'] ?? '未知职业')) ?></td>
-                            <td><?= (int)($player['level'] ?? 0) ?></td>
-                            <td><?= $this->h($player['location'] ?? '未知位置') ?></td>
+                            <td class="level-cell"><?= (int)($player['level'] ?? 0) ?></td>
+                            <td class="guild-cell"><?= $this->h(($player['guild'] ?? '') !== '' ? $player['guild'] : '-') ?></td>
+                            <td class="title-cell"><?= $this->h($player['title'] ?? 'None') ?></td>
+                            <td class="location-cell"><?= $this->h($player['location'] ?? 'Unknown') ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

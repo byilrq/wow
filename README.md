@@ -117,3 +117,21 @@ curl -I http://127.0.0.1:8080
 ```text
 https://你的域名/
 ```
+
+## 流畅度修复说明
+
+本版优化了注册页切回首页/公告页时的卡顿问题：
+
+- 注册写库或 SOAP 前会提前释放 PHP session 锁，避免后续页面请求排队。
+- 首页在线玩家状态增加短缓存，默认 15 秒，避免每次切页都实时访问远程角色库。
+- 数据库连接默认短超时，远程数据库异常时不会长时间拖住页面。
+- 首页不再为了显示在线玩家而每次访问 auth 库读取账号数/realmlist。
+
+可在 `.env` 中调整：
+
+```env
+DB_TIMEOUT=2
+NETWORK_TIMEOUT=3
+PHP_REQUEST_TIMEOUT=12
+STATUS_CACHE_SECONDS=15
+```

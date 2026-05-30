@@ -146,6 +146,13 @@ $config['realmlists'] = array(
     ),
 );
 
+
+// 性能与超时配置 - 防止远程数据库或外部验证码服务异常时导致页面切换卡住。
+$config['db_timeout'] = (int) env('DB_TIMEOUT', 2); // 数据库连接超时秒数；远程数据库建议 2-3 秒。
+$config['network_timeout'] = (int) env('NETWORK_TIMEOUT', 3); // 外部网络请求超时秒数，例如验证码服务校验。
+$config['php_request_timeout'] = (int) env('PHP_REQUEST_TIMEOUT', 12); // 单个 PHP 请求最大执行秒数，避免长期占用 PHP-FPM。
+$config['status_cache_seconds'] = (int) env('STATUS_CACHE_SECONDS', 15); // 首页在线玩家状态缓存秒数，提升切页流畅度。
+
 // 公告管理配置 - 用于公告页面新增/删除公告时校验。
 $config['announcement_pin'] = env('ANNOUNCEMENT_PIN', '0819'); // 公告新增/删除 PIN 码
 

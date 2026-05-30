@@ -49,6 +49,9 @@ final class WowApp
             ini_set('display_errors', '1');
             error_reporting(E_ALL);
         }
+        // 所有外部请求默认短超时，避免验证码/远程数据库异常时拖慢页面切换。
+        ini_set('default_socket_timeout', (string)(int)$this->cfg('network_timeout', 3));
+        set_time_limit((int)$this->cfg('php_request_timeout', 12));
         if (session_status() !== PHP_SESSION_ACTIVE) {
             session_start();
         }
@@ -75,12 +78,18 @@ final class WowApp
             }
         }
 
+        $normalizedPage = $page === 'status' ? 'home' : $page;
+        if ($normalizedPage !== 'register') {
+            // 首页/公告页不需要继续写 session，提前释放锁，切换页面更顺畅。
+            $this->closeSession();
+        }
+
         $this->render(match ($page) {
             'register' => $this->pageRegister(),
             'status' => $this->pageHome(),
             'announcements', 'news' => $this->pageAnnouncements(),
             default => $this->pageHome(),
-        }, $page === 'status' ? 'home' : $page);
+        }, $normalizedPage);
     }
 
     private function cfg(string $key, mixed $default = null): mixed
@@ -91,6 +100,13 @@ final class WowApp
     private function csrf(): string
     {
         return $_SESSION['csrf'] ?? '';
+    }
+
+    private function closeSession(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
     }
 
     private function h(mixed $value): string
@@ -121,12 +137,24 @@ final class WowApp
 
     private function db(array $cfg): PDO
     {
-        $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4', $cfg['host'], (int)$cfg['port'], $cfg['database']);
-        return new PDO($dsn, $cfg['username'], $cfg['password'], [
+        $timeout = max(1, (int)$this->cfg('db_timeout', 2));
+        $dsn = sprintf(
+            'mysql:host=%s;port=%d;dbname=%s;charset=utf8mb4;connect_timeout=%d',
+            $cfg['host'],
+            (int)$cfg['port'],
+            $cfg['database'],
+            $timeout
+        );
+        $options = [
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
             PDO::ATTR_EMULATE_PREPARES => false,
-        ]);
+            PDO::ATTR_TIMEOUT => $timeout,
+        ];
+        if (defined('PDO::MYSQL_ATTR_INIT_COMMAND')) {
+            $options[PDO::MYSQL_ATTR_INIT_COMMAND] = 'SET SESSION wait_timeout=5';
+        }
+        return new PDO($dsn, $cfg['username'], $cfg['password'], $options);
     }
 
     private function authCfg(): array
@@ -180,6 +208,9 @@ final class WowApp
             $repassword = (string)($_POST['repassword'] ?? '');
 
             $this->validateRegistration($username, $email, $password, $repassword);
+
+            // 注册写库/ SOAP 可能访问远程服务。提前释放 PHP session 锁，避免用户马上切首页/公告时排队卡住。
+            $this->closeSession();
 
             if (!empty($this->config['soap_for_register'])) {
                 $this->registerViaSoap($username, $password);
@@ -367,42 +398,37 @@ final class WowApp
 
     private function status(): array
     {
+        $cacheTtl = max(0, (int)$this->cfg('status_cache_seconds', 15));
+        if ($cacheTtl > 0 && ($cached = $this->readStatusCache($cacheTtl)) !== null) {
+            return $cached;
+        }
+
         $result = [
-            'auth_online' => false,
+            'auth_online' => null,
             'realms' => [],
             'total_accounts' => null,
             'total_online' => 0,
             'online_players' => [],
             'online_limit' => 49,
+            'cached' => false,
         ];
+
         try {
-            $auth = $this->auth();
-            $result['auth_online'] = true;
-            $result['total_accounts'] = (int)$auth->query('SELECT COUNT(*) FROM account')->fetchColumn();
-            $realmlist = [];
-            try {
-                foreach ($auth->query('SELECT id, name, address, port, population FROM realmlist') as $row) {
-                    $realmlist[(int)$row['id']] = $row;
-                }
-            } catch (Throwable) {
-                $realmlist = [];
-            }
+            // 首页只展示在线玩家，因此不再每次访问都连接 auth 库读取账号数/realmlist，减少远程库慢导致的卡顿。
             foreach ($this->cfg('realmlists', []) as $id => $realmRaw) {
                 $realmCfg = $this->realmCfg($id);
-                $realmId = (int)$realmCfg['id'];
                 $realm = [
-                    'id' => $realmId,
-                    'name' => $realmlist[$realmId]['name'] ?? $realmCfg['name'],
-                    'address' => $realmlist[$realmId]['address'] ?? $this->cfg('realmlist', ''),
-                    'port' => $realmlist[$realmId]['port'] ?? 8085,
-                    'population' => $realmlist[$realmId]['population'] ?? null,
+                    'id' => (int)$realmCfg['id'],
+                    'name' => $realmCfg['name'],
+                    'address' => $this->cfg('realmlist', ''),
+                    'port' => 8085,
+                    'population' => null,
                     'online' => null,
                     'characters' => null,
                     'ok' => false,
                 ];
                 try {
                     $db = $this->realmDb($id);
-                    $realm['characters'] = (int)$db->query('SELECT COUNT(*) FROM characters')->fetchColumn();
                     $realm['online'] = (int)$db->query('SELECT COUNT(*) FROM characters WHERE online = 1')->fetchColumn();
                     $realm['ok'] = true;
                     $result['total_online'] += $realm['online'];
@@ -417,10 +443,53 @@ final class WowApp
             }
             usort($result['online_players'], fn($a, $b) => [$b['level'], $a['name']] <=> [$a['level'], $b['name']]);
             $result['online_players'] = array_slice($result['online_players'], 0, (int)$result['online_limit']);
+            $this->writeStatusCache($result);
         } catch (Throwable $e) {
             $result['error'] = $e->getMessage();
+            if (($cached = $this->readStatusCache(86400)) !== null) {
+                $cached['cached'] = true;
+                $cached['error'] = $e->getMessage();
+                return $cached;
+            }
         }
         return $result;
+    }
+
+    private function statusCachePath(): string
+    {
+        return dirname(__DIR__) . '/storage/status-cache.json';
+    }
+
+    private function readStatusCache(int $ttl): ?array
+    {
+        $path = $this->statusCachePath();
+        if (!is_file($path)) {
+            return null;
+        }
+        $raw = @file_get_contents($path);
+        $data = is_string($raw) ? json_decode($raw, true) : null;
+        if (!is_array($data) || !isset($data['saved_at'], $data['status'])) {
+            return null;
+        }
+        if ((time() - (int)$data['saved_at']) > $ttl) {
+            return null;
+        }
+        if (!is_array($data['status'])) {
+            return null;
+        }
+        $data['status']['cached'] = true;
+        $data['status']['cache_age'] = time() - (int)$data['saved_at'];
+        return $data['status'];
+    }
+
+    private function writeStatusCache(array $status): void
+    {
+        $path = $this->statusCachePath();
+        $status['cached'] = false;
+        @file_put_contents($path, json_encode([
+            'saved_at' => time(),
+            'status' => $status,
+        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT), LOCK_EX);
     }
 
     private function onlinePlayers(PDO $db, string $realmName, int $limit): array
@@ -573,7 +642,7 @@ final class WowApp
             <div class="section-title">
                 <div>
                     <h2>在线玩家</h2>
-                    <p>最多显示<?= $limit ?>个在线玩家 - 当前在线玩家: <?= $totalOnline ?></p>
+                    <p>最多显示<?= $limit ?>个在线玩家 - 当前在线玩家: <?= $totalOnline ?><?php if (!empty($status['cached'])): ?> <span class="muted">（缓存<?= isset($status['cache_age']) ? ' ' . (int)$status['cache_age'] . ' 秒' : '' ?>）</span><?php endif; ?></p>
                 </div>
                 <span class="badge ok">实时状态</span>
             </div>
@@ -615,7 +684,11 @@ final class WowApp
                 <button class="btn primary" type="submit">创建账号</button>
             </form>
         </section>
-        <?php return (string)ob_get_clean();
+        <?php
+        $html = (string)ob_get_clean();
+        // 图形验证码已写入 session，随后立即释放锁，防止用户点首页/公告时等待注册页请求结束。
+        $this->closeSession();
+        return $html;
     }
 
     private function captchaWidget(): string

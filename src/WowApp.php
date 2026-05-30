@@ -68,7 +68,7 @@ final class WowApp
             $action = (string)($_POST['action'] ?? '');
             if ($action === 'register') {
                 $this->handleRegister();
-                $page = 'register';
+                $page = 'home';
             } elseif ($action === 'add_announcement') {
                 $this->handleAddAnnouncement();
                 $page = 'announcements';
@@ -78,15 +78,10 @@ final class WowApp
             }
         }
 
-        $normalizedPage = $page === 'status' ? 'home' : $page;
-        if ($normalizedPage !== 'register') {
-            // 首页/公告页不需要继续写 session，提前释放锁，切换页面更顺畅。
-            $this->closeSession();
-        }
+        $normalizedPage = in_array($page, ['status', 'register'], true) ? 'home' : $page;
 
         $this->render(match ($page) {
-            'register' => $this->pageRegister(),
-            'status' => $this->pageHome(),
+            'register', 'status' => $this->pageHome(),
             'announcements', 'news' => $this->pageAnnouncements(),
             default => $this->pageHome(),
         }, $normalizedPage);
@@ -790,18 +785,17 @@ final class WowApp
         $status = $this->status();
         $realmName = $this->firstRealmName();
         ob_start(); ?>
-        <section class="hero hero-compact">
+        <section class="hero hero-compact hero-with-register">
             <div class="wlk-logo-wrap" aria-label="WLK">
                 <img class="wlk-logo" src="assets/wlk-logo.png" alt="Wrath of the Lich King">
             </div>
-            <div class="panel metric">
-                <span>服务器状态</span>
-                <strong><?= (int)$status['total_online'] ?></strong>
-                <small><?= $this->h($this->cfg('game_version')) ?></small>
+            <div class="panel hero-register-panel">
+                <h2>账号注册</h2>
+                <?= $this->compactRegisterForm() ?>
             </div>
         </section>
         <section class="grid two">
-            <div class="card"><h2>服务器信息</h2><p>服务器：<?= $this->h($realmName) ?></p><p>版本：<?= $this->h($this->cfg('game_version')) ?></p><p class="launcher-download-row"><span>WOWOL.bat</span><a class="launcher-icon-link" href="<?= $this->h($this->launcherUrl()) ?>" download aria-label="下载 WOWOL.bat" title="下载 WOWOL.bat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.29V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg></a></p></div>
+            <div class="card"><h2>服务器信息</h2><p>服务器：<?= $this->h($realmName) ?></p><p>版本：<?= $this->h($this->cfg('game_version')) ?></p><p class="launcher-download-row"><span>登陆器下载</span><a class="launcher-icon-link" href="<?= $this->h($this->launcherUrl()) ?>" download aria-label="下载登陆器" title="下载登陆器"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.29V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg></a></p></div>
             <div class="card"><h2>最新公告</h2><?= $this->announcementList(2, false) ?></div>
         </section>
         <?= $this->onlinePlayersTable($status) ?>
@@ -811,17 +805,19 @@ final class WowApp
     private function onlinePlayersTable(array $status): string
     {
         $players = $status['online_players'] ?? [];
-        $limit = (int)($status['online_limit'] ?? 49);
         $totalOnline = (int)($status['total_online'] ?? 0);
         ob_start(); ?>
-        <section id="online-players" class="card online-players">
-            <div class="section-title">
+        <section id="online-players" class="card online-players server-status-card">
+            <div class="section-title server-status-title">
                 <div>
                     <h2>服务器状态</h2>
                 </div>
-                <span class="badge ok"><?= $totalOnline > 0 ? '在线' : '离线' ?></span>
+                <div class="status-summary">
+                    <span class="online-total">当前在线：<?= $totalOnline ?> 人</span>
+                    <span class="badge <?= $totalOnline > 0 ? 'ok' : 'bad' ?>"><?= $totalOnline > 0 ? '在线' : '离线' ?></span>
+                </div>
             </div>
-            <div class="table-wrap">
+            <div class="table-wrap status-player-panel">
                 <table>
                     <thead><tr><th>角色</th><th>种族</th><th>职业</th><th>等级</th></tr></thead>
                     <tbody>
@@ -843,27 +839,27 @@ final class WowApp
         <?php return (string)ob_get_clean();
     }
 
-    private function pageRegister(): string
+    private function compactRegisterForm(): string
     {
         ob_start(); ?>
-        <section class="page-head"><h1>账号注册</h1><p>创建 Azerother AI服务器 游戏账号后，请在客户端使用账号名和密码登录。</p></section>
-        <section class="card form-card">
-            <form method="post" action="?page=register" autocomplete="off">
-                <input type="hidden" name="csrf" value="<?= $this->h($this->csrf()) ?>">
-                <input type="hidden" name="action" value="register">
+        <form class="register-inline-form" method="post" action="?page=home" autocomplete="off">
+            <input type="hidden" name="csrf" value="<?= $this->h($this->csrf()) ?>">
+            <input type="hidden" name="action" value="register">
+            <div class="register-field-grid">
                 <label>邮箱<input name="email" type="email" required placeholder="you@example.com"></label>
                 <label>账号名<input name="username" required minlength="2" maxlength="16" pattern="[A-Za-z0-9_-]+" placeholder="USERNAME"></label>
                 <label>密码<input name="password" type="password" required minlength="4" maxlength="16"></label>
                 <label>重复密码<input name="repassword" type="password" required minlength="4" maxlength="16"></label>
-                <?= $this->captchaWidget() ?>
-                <button class="btn primary" type="submit">创建账号</button>
-            </form>
-        </section>
-        <?php
-        $html = (string)ob_get_clean();
-        // 图形验证码已写入 session，随后立即释放锁，防止用户点首页/公告时等待注册页请求结束。
-        $this->closeSession();
-        return $html;
+            </div>
+            <?= $this->captchaWidget() ?>
+            <button class="btn primary compact-submit" type="submit">创建账号</button>
+        </form>
+        <?php return (string)ob_get_clean();
+    }
+
+    private function pageRegister(): string
+    {
+        return $this->pageHome();
     }
 
     private function captchaWidget(): string
@@ -1017,7 +1013,7 @@ final class WowApp
     private function render(string $content, string $page): void
     {
         $title = $this->h($this->cfg('page_title', 'Azerother AI服务器'));
-        $nav = ['home' => '首页', 'register' => '注册', 'announcements' => '公告'];
+        $nav = ['home' => '首页', 'announcements' => '公告'];
         ?>
         <!doctype html><html lang="zh-CN"><head>
             <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">

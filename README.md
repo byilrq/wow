@@ -1,5 +1,13 @@
-# 黑石 WoW 注册站
+# Azerother AI服务器 WoW 注册站
 
+这是一个精简架构的 WoW 私服注册与信息展示站点，包含：
+
+- 首页 + 在线玩家列表
+- 注册页面
+- 公告页面，可通过 PIN 添加/删除公告
+- 登录器下载链接 `/downloads/WOWOL.bat`
+- Nginx 本地网站配置
+- Nginx stream 游戏流量转发：TCP 3724 / 8085
 
 ## 目录结构
 
@@ -12,6 +20,7 @@ storage/announcements.json# 公告数据
 config.php                # 配置文件，保留中文注释
 wow.sh                    # 主安装/更新脚本
 wow.py                    # 兼容入口，调用 wow.sh
+h.sh                      # Hysteria 安装脚本
 ```
 
 ## 部署
@@ -49,6 +58,20 @@ http://127.0.0.1:8080
 WOW_BIND_MODE=public_https sudo -E bash wow.sh
 ```
 
+## 登录器下载
+
+把 `WOWOL.bat` 放在 GitHub 仓库根目录。安装时 `wow.sh` 会自动复制到：
+
+```text
+/www/wow/public/downloads/WOWOL.bat
+```
+
+网页首页会显示“登录器下载”，浏览器访问：
+
+```text
+/downloads/WOWOL.bat
+```
+
 ## 游戏流量转发
 
 保留旧版 Nginx stream 转发能力。默认配置：
@@ -60,3 +83,61 @@ GAME_PROXY_AUTH_PORT=3724
 GAME_PROXY_WORLD_PORT=8085
 ```
 
+脚本会生成：
+
+```text
+/etc/nginx/stream-conf.d/wow-game-proxy.conf
+```
+
+效果：
+
+```text
+玩家 -> 本 VPS:3724 -> byilrq.iok.la:3724
+玩家 -> 本 VPS:8085 -> byilrq.iok.la:8085
+```
+
+这对应旧版 `nginx.conf` 里的 `stream` 配置。
+
+如需关闭游戏转发：
+
+```bash
+GAME_PROXY_ENABLE=false sudo -E bash wow.sh
+```
+
+## Hysteria 说明
+
+`wow.sh` 不会修改 Hysteria 配置。Hysteria 安装和伪装站选择由 `h.sh` 管理。你可以选择外部伪装站，也可以选择本地 WoW 站：
+
+```text
+http://127.0.0.1:8080
+```
+
+## 配置
+
+`.env` 可覆盖 `config.php` 中的参数，例如：
+
+```env
+APP_NAME=Azerother AI服务器
+REALMLIST=你的域名
+LAUNCHER_FILE=downloads/WOWOL.bat
+LAUNCHER_LABEL=登录器下载
+DB_AUTH_HOST=byilrq.iok.la
+DB_AUTH_PORT=58006
+GAME_PROXY_ENABLE=true
+GAME_PROXY_TARGET_HOST=byilrq.iok.la
+```
+
+## 本版更新：在线玩家稳定显示
+
+- 在线玩家列表保留稳定字段：角色、种族图标、职业图标、等级。
+- 已取消公会、头衔、地图位置列，避免不同核心/数据库结构差异导致读取失败。
+- 当没有在线玩家或角色库暂时不可读时，统一提示：服务器离线！
+
+
+## 本版更新：首页视觉精简
+
+- 站点标题默认改为 `Azerother AI服务器`。
+- 首页主视觉从文字标题改为 WLK 图标。
+- 首页去掉说明语、Realmlist 提示和大按钮区。
+- `WOWOL.bat` 以文件名 + 下载图标形式展示。
+- 在线玩家模块标题改为“服务器状态”，并隐藏人数/缓存提示。

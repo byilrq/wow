@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320" role="img" aria-label="WLK">
+  <defs>
+    <radialGradient id="ice" cx="50%" cy="42%" r="62%">
+      <stop offset="0" stop-color="#f7fbff"/>
+      <stop offset="0.38" stop-color="#9fe7ff"/>
+      <stop offset="0.72" stop-color="#2167b8"/>
+      <stop offset="1" stop-color="#08142d"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#ffe08a"/>
+      <stop offset="0.5" stop-color="#d99a24"/>
+      <stop offset="1" stop-color="#6e4213"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <circle cx="160" cy="160" r="139" fill="#050914" stroke="url(#gold)" stroke-width="10"/>
+  <circle cx="160" cy="160" r="115" fill="url(#ice)" stroke="#d8f5ff" stroke-opacity=".65" stroke-width="3"/>
+  <path d="M160 38l18 67 65-23-35 60 58 38-67 13 8 70-47-52-47 52 8-70-67-13 58-38-35-60 65 23z" fill="#dff8ff" opacity=".36" filter="url(#glow)"/>
+  <path d="M160 60c30 35 43 71 39 108-3 31-19 59-39 84-20-25-36-53-39-84-4-37 9-73 39-108z" fill="#0b1b3e" opacity=".76"/>
+  <path d="M112 128c20 7 34 17 48 36 14-19 28-29 48-36-8 27-23 50-48 76-25-26-40-49-48-76z" fill="#8feaff" opacity=".9"/>
+  <text x="160" y="282" text-anchor="middle" font-family="Georgia,serif" font-size="42" font-weight="700" fill="url(#gold)" stroke="#160b04" stroke-width="2">WLK</text>
+</svg>

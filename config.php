@@ -10,7 +10,7 @@
 // 基础配置 - 按你的网站信息进行调整。
 // 必须填写一个有效 URL，否则可能导致图片/模板资源加载异常。
 $config['baseurl'] = env('APP_URL', "https://sharq.eu.org"); // 有域名填域名，没有填服务器的IP
-$config['page_title'] = env('APP_NAME', "黑石"); // 网站标题（浏览器标签页显示的标题）
+$config['page_title'] = env('APP_NAME', "Azerother AI服务器"); // 网站标题（浏览器标签页显示的标题）
 $config['language'] = env('APP_LANGUAGE', "chinese-simplified"); // 网站默认语言
 $config['supported_langs'] = [ // 支持的语言列表（不需要的语言可以删除）
     // 如需关闭语言切换，把它设置为：$config['supported_langs'] = false;

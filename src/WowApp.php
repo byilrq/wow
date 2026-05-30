@@ -790,25 +790,18 @@ final class WowApp
         $status = $this->status();
         $realmName = $this->firstRealmName();
         ob_start(); ?>
-        <section class="hero">
-            <div>
-                <p class="eyebrow">黑石 · 私服注册站</p>
-                <h1><?= $this->h($realmName) ?></h1>
-                <p>注册账号、查看在线玩家、阅读最新公告。客户端 Realmlist：<code>set realmlist <?= $this->h($this->cfg('realmlist')) ?></code></p>
-                <p class="launcher-line"><a class="download-link" href="<?= $this->h($this->launcherUrl()) ?>" download><?= $this->h($this->cfg('launcher_label', '登录器下载')) ?></a></p>
-                <div class="actions">
-                    <a class="btn primary" href="?page=register">立即注册</a>
-                    <a class="btn" href="#online-players">在线玩家</a>
-                </div>
+        <section class="hero hero-compact">
+            <div class="wlk-logo-wrap" aria-label="WLK">
+                <img class="wlk-logo" src="assets/wlk-icon.svg" alt="WLK">
             </div>
             <div class="panel metric">
-                <span>当前在线玩家</span>
+                <span>服务器状态</span>
                 <strong><?= (int)$status['total_online'] ?></strong>
                 <small><?= $this->h($this->cfg('game_version')) ?></small>
             </div>
         </section>
         <section class="grid two">
-            <div class="card"><h2>服务器信息</h2><p>服务器：<?= $this->h($realmName) ?></p><p>版本：<?= $this->h($this->cfg('game_version')) ?></p><p>Realmlist：<?= $this->h($this->cfg('realmlist')) ?></p><p><?= $this->h($this->cfg('launcher_label', '登录器下载')) ?>：<a href="<?= $this->h($this->launcherUrl()) ?>" download><?= $this->h(basename((string)$this->cfg('launcher_file', 'downloads/WOWOL.bat'))) ?></a></p></div>
+            <div class="card"><h2>服务器信息</h2><p>服务器：<?= $this->h($realmName) ?></p><p>版本：<?= $this->h($this->cfg('game_version')) ?></p><p class="launcher-download-row"><span>WOWOL.bat</span><a class="launcher-icon-link" href="<?= $this->h($this->launcherUrl()) ?>" download aria-label="下载 WOWOL.bat" title="下载 WOWOL.bat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a1 1 0 0 1 1 1v8.59l2.3-2.29a1 1 0 1 1 1.4 1.42l-4 4a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.42l2.3 2.29V4a1 1 0 0 1 1-1Zm-7 14a1 1 0 0 1 1 1v1h12v-1a1 1 0 1 1 2 0v2a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-2a1 1 0 0 1 1-1Z"/></svg></a></p></div>
             <div class="card"><h2>最新公告</h2><?= $this->announcementList(2, false) ?></div>
         </section>
         <?= $this->onlinePlayersTable($status) ?>
@@ -824,10 +817,9 @@ final class WowApp
         <section id="online-players" class="card online-players">
             <div class="section-title">
                 <div>
-                    <h2>在线玩家</h2>
-                    <p>最多显示<?= $limit ?>个在线玩家 - 当前在线玩家: <?= $totalOnline ?><?php if (!empty($status['cached'])): ?> <span class="muted">（缓存<?= isset($status['cache_age']) ? ' ' . (int)$status['cache_age'] . ' 秒' : '' ?>）</span><?php endif; ?></p>
+                    <h2>服务器状态</h2>
                 </div>
-                <span class="badge ok">实时状态</span>
+                <span class="badge ok"><?= $totalOnline > 0 ? '在线' : '离线' ?></span>
             </div>
             <div class="table-wrap">
                 <table>
@@ -854,7 +846,7 @@ final class WowApp
     private function pageRegister(): string
     {
         ob_start(); ?>
-        <section class="page-head"><h1>账号注册</h1><p>创建黑石游戏账号后，请在客户端使用账号名和密码登录。</p></section>
+        <section class="page-head"><h1>账号注册</h1><p>创建 Azerother AI服务器 游戏账号后，请在客户端使用账号名和密码登录。</p></section>
         <section class="card form-card">
             <form method="post" action="?page=register" autocomplete="off">
                 <input type="hidden" name="csrf" value="<?= $this->h($this->csrf()) ?>">
@@ -1019,12 +1011,12 @@ final class WowApp
     {
         $realms = $this->cfg('realmlists', []);
         $first = is_array($realms) ? reset($realms) : [];
-        return (string)($first['realmname'] ?? $this->cfg('page_title', '黑石'));
+        return (string)($first['realmname'] ?? $this->cfg('page_title', 'Azerother AI服务器'));
     }
 
     private function render(string $content, string $page): void
     {
-        $title = $this->h($this->cfg('page_title', '黑石'));
+        $title = $this->h($this->cfg('page_title', 'Azerother AI服务器'));
         $nav = ['home' => '首页', 'register' => '注册', 'announcements' => '公告'];
         ?>
         <!doctype html><html lang="zh-CN"><head>
@@ -1038,7 +1030,7 @@ final class WowApp
             <?php foreach ($this->flash as $message): ?><div class="flash <?= $this->h($message['type']) ?>"><?= $this->h($message['message']) ?></div><?php endforeach; ?>
             <?= $content ?>
         </main>
-        <footer>© <?= date('Y') ?> <?= $title ?> · Realmlist: <?= $this->h($this->cfg('realmlist')) ?></footer>
+        <footer>© <?= date('Y') ?> <?= $title ?></footer>
         </body></html>
         <?php
     }

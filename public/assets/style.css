@@ -76,3 +76,14 @@ footer{text-align:center;color:var(--muted);padding:28px}@media(max-width:760px)
 .status-player-panel{min-width:0}
 .launcher-download-row span{color:#fff;letter-spacing:.02em}
 @media(max-width:900px){.status-content-grid{grid-template-columns:1fr}.status-register-panel{max-width:none}.status-summary{justify-content:flex-start}}
+
+
+/* 首页顶部：注册表单替代原来的小服务器状态卡片，避免和下方服务器状态重复 */
+.hero-with-register{grid-template-columns:minmax(0,1.25fr) minmax(260px,340px)}
+.hero-register-panel{padding:18px;max-width:340px;justify-self:end;width:100%}
+.hero-register-panel h2{margin:0 0 12px;color:var(--gold);font-size:20px}
+.hero-register-panel .register-inline-form{gap:10px}
+.hero-register-panel input{padding:9px 11px;border-radius:11px;font-size:14px}
+.hero-register-panel .btn.compact-submit{padding:10px 12px}
+.server-status-card .status-player-panel{margin-top:14px}
+@media(max-width:900px){.hero-with-register{grid-template-columns:1fr}.hero-register-panel{justify-self:stretch;max-width:none}.server-status-card .status-summary{justify-content:flex-start}}

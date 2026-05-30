@@ -785,14 +785,13 @@ final class WowApp
         $status = $this->status();
         $realmName = $this->firstRealmName();
         ob_start(); ?>
-        <section class="hero hero-compact">
+        <section class="hero hero-compact hero-with-register">
             <div class="wlk-logo-wrap" aria-label="WLK">
                 <img class="wlk-logo" src="assets/wlk-logo.png" alt="Wrath of the Lich King">
             </div>
-            <div class="panel metric">
-                <span>服务器状态</span>
-                <strong><?= (int)$status['total_online'] ?></strong>
-                <small><?= $this->h($this->cfg('game_version')) ?></small>
+            <div class="panel hero-register-panel">
+                <h2>账号注册</h2>
+                <?= $this->compactRegisterForm() ?>
             </div>
         </section>
         <section class="grid two">
@@ -818,31 +817,23 @@ final class WowApp
                     <span class="badge <?= $totalOnline > 0 ? 'ok' : 'bad' ?>"><?= $totalOnline > 0 ? '在线' : '离线' ?></span>
                 </div>
             </div>
-            <div class="status-content-grid">
-                <aside class="status-register-panel">
-                    <h3>账号注册</h3>
-                    <?= $this->compactRegisterForm() ?>
-                </aside>
-                <div class="status-player-panel">
-                    <div class="table-wrap">
-                        <table>
-                            <thead><tr><th>角色</th><th>种族</th><th>职业</th><th>等级</th></tr></thead>
-                            <tbody>
-                            <?php if (!$players): ?>
-                                <tr><td colspan="4" class="empty-row offline-row">服务器离线！</td></tr>
-                            <?php endif; ?>
-                            <?php foreach ($players as $player): ?>
-                                <tr>
-                                    <td><?= $this->h($player['name'] ?? '') ?></td>
-                                    <td class="icon-cell"><?= $this->iconImg($player['race_icon'] ?? null, (string)($player['race'] ?? '未知种族')) ?></td>
-                                    <td class="icon-cell"><?= $this->iconImg($player['class_icon'] ?? null, (string)($player['class'] ?? '未知职业')) ?></td>
-                                    <td class="level-cell"><?= (int)($player['level'] ?? 0) ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+            <div class="table-wrap status-player-panel">
+                <table>
+                    <thead><tr><th>角色</th><th>种族</th><th>职业</th><th>等级</th></tr></thead>
+                    <tbody>
+                    <?php if (!$players): ?>
+                        <tr><td colspan="4" class="empty-row offline-row">服务器离线！</td></tr>
+                    <?php endif; ?>
+                    <?php foreach ($players as $player): ?>
+                        <tr>
+                            <td><?= $this->h($player['name'] ?? '') ?></td>
+                            <td class="icon-cell"><?= $this->iconImg($player['race_icon'] ?? null, (string)($player['race'] ?? '未知种族')) ?></td>
+                            <td class="icon-cell"><?= $this->iconImg($player['class_icon'] ?? null, (string)($player['class'] ?? '未知职业')) ?></td>
+                            <td class="level-cell"><?= (int)($player['level'] ?? 0) ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
         </section>
         <?php return (string)ob_get_clean();

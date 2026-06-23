@@ -446,7 +446,7 @@ menu() {
   echo " 本地监听：${LOCAL_BIND_HOST}:${LOCAL_HTTP_PORT}"
   echo " 游戏转发：${GAME_PROXY_ENABLE} -> ${GAME_PROXY_TARGET_HOST}:${GAME_PROXY_AUTH_PORT}/${GAME_PROXY_WORLD_PORT}"
   echo "=========================================="
-  echo "1) 一键安装 / 更新网站与 Nginx 配置"
+  echo "1) 一键安装 / 更新网站"
   echo "2) 修改域名"
   echo "3) 更新证书（仅 public_https 模式）"
   echo "0) 退出"
@@ -454,6 +454,22 @@ menu() {
   read -rp "请输入选项编号：" choice
   case "$choice" in
     1)
+      echo ""
+      echo "请选择网站监听模式："
+      echo " 1) 本机监听（默认）: http://127.0.0.1:8080"
+      echo "    适合 Hysteria / Xray / Caddy 已占用公网 443 的服务器。"
+      echo "    公网 HTTPS 由其他代理软件管理，Nginx 只监听本机 8080。"
+      echo ""
+      echo " 2) 公网 80/443: Nginx 直接管理 HTTPS"
+      echo "    适合没有其他代理软件占用 443 的服务器。"
+      echo "    脚本将自动申请 Let's Encrypt 证书并配置 HTTPS。"
+      echo ""
+      read -rp "请选择 [1/2]（回车默认 1）: " mode_choice
+      if [[ "$mode_choice" == "2" ]]; then
+        WOW_BIND_MODE="public_https"
+      else
+        WOW_BIND_MODE="local_proxy"
+      fi
       read -rp "请输入域名（回车默认 ${DEFAULT_DOMAIN}）：" input_domain
       install_or_update "${input_domain:-$DEFAULT_DOMAIN}"
       ;;

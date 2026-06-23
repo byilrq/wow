@@ -341,10 +341,16 @@ EOF_STREAM_CONF
 
 obtain_cert() {
   local domain="$1"
-  [[ -f "/etc/letsencrypt/live/${domain}/fullchain.pem" ]] && return 0
+  # 检查本地已有 Let's Encrypt 证书（与 x.sh/h.sh 共用）
+  if [[ -f "/etc/letsencrypt/live/${domain}/fullchain.pem" ]]; then
+    green "检测到已有 Let's Encrypt 证书：/etc/letsencrypt/live/${domain}/，跳过申请直接复用"
+    return 0
+  fi
   apt_install certbot
   mkdir -p "$WEB_ROOT/public/.well-known/acme-challenge"
-  write_nginx_site_http "$domain"
+  if [[ "$WOW_BIND_MODE" == "public_https" ]]; then
+    write_nginx_site_http "$domain"
+  fi
   certbot certonly --agree-tos -m "$EMAIL" --webroot -w "$WEB_ROOT/public" -d "$domain"
 }
 
@@ -352,13 +358,33 @@ install_or_update() {
   local domain="$1"
   [[ "$WOW_BIND_MODE" == "local_proxy" || "$WOW_BIND_MODE" == "public_https" ]] || { echo "WOW_BIND_MODE 只能是 local_proxy 或 public_https"; exit 1; }
 
-  log "安装基础依赖与 Nginx"
-  apt_install ca-certificates curl rsync git gnupg lsb-release nginx
-  apt_install libnginx-mod-stream || true
-  setup_php_repo
-  apt_install "php${PHP_VER}" "php${PHP_VER}-cli" "php${PHP_VER}-fpm" "php${PHP_VER}-mysql" "php${PHP_VER}-gmp" "php${PHP_VER}-curl" "php${PHP_VER}-mbstring" "php${PHP_VER}-xml" "php${PHP_VER}-zip" "php${PHP_VER}-soap"
+  log "检查系统 Nginx/PHP 状态"
+  local need_nginx="n"
+  local need_php="n"
+  if ! command -v nginx >/dev/null 2>&1; then
+    need_nginx="y"
+  else
+    log "检测到系统已有 nginx，跳过安装"
+  fi
+  if ! command -v "php${PHP_VER}-fpm" >/dev/null 2>&1 && ! systemctl list-unit-files 2>/dev/null | grep -q "php${PHP_VER}-fpm"; then
+    need_php="y"
+  else
+    log "检测到系统已有 PHP ${PHP_VER}，跳过安装"
+  fi
 
-  systemctl enable nginx "php${PHP_VER}-fpm" || true
+  if [[ "$need_nginx" == "y" || "$need_php" == "y" ]]; then
+    log "安装基础依赖与 Nginx"
+    apt_install ca-certificates curl rsync git gnupg lsb-release
+    [[ "$need_nginx" == "y" ]] && apt_install nginx
+    apt_install libnginx-mod-stream || true
+
+    if [[ "$need_php" == "y" ]]; then
+      setup_php_repo
+      apt_install "php${PHP_VER}" "php${PHP_VER}-cli" "php${PHP_VER}-fpm" "php${PHP_VER}-mysql" "php${PHP_VER}-gmp" "php${PHP_VER}-curl" "php${PHP_VER}-mbstring" "php${PHP_VER}-xml" "php${PHP_VER}-zip" "php${PHP_VER}-soap"
+    fi
+
+    systemctl enable nginx "php${PHP_VER}-fpm" || true
+  fi
   open_firewall_ports
   deploy_source
   ensure_env "$domain"

@@ -1,0 +1,24 @@
+{
+    "saved_at": 1783818547,
+    "status": {
+        "auth_online": null,
+        "realms": [
+            {
+                "id": 1,
+                "name": "黑石",
+                "address": "wow.xyrq.de",
+                "port": 8085,
+                "population": null,
+                "online": null,
+                "characters": null,
+                "ok": false,
+                "error": "SQLSTATE[HY000] [2002] Connection timed out"
+            }
+        ],
+        "total_accounts": null,
+        "total_online": 0,
+        "online_players": [],
+        "online_limit": 49,
+        "cached": false
+    }
+}

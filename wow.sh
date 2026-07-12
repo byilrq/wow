@@ -304,6 +304,11 @@ ensure_nginx_stream_include() {
 
 # WoW 游戏 TCP 转发配置入口，由 wow.sh 管理。
 stream {
+    # DNS 解析配置：使用公共 DNS，防止域名解析失败导致 nginx 启动失败
+    # 特别是当上游服务器（NAS）离线时，也能正常启动
+    resolver 8.8.8.8 8.8.4.4 valid=10s;
+    resolver_timeout 5s;
+
     include /etc/nginx/stream-conf.d/*.conf;
 }
 EOF_STREAM
@@ -323,16 +328,30 @@ write_game_proxy_config() {
   cat > /etc/nginx/stream-conf.d/wow-game-proxy.conf <<EOF_STREAM_CONF
 # WoW 游戏流量转发：玩家连接本 VPS，Nginx 转发到真实游戏服务器。
 # 来源：旧版 nginx.conf 中的 stream 转发功能，保留 3724 / 8085。
+
+# 定义上游服务器（支持动态 DNS 解析）
+upstream game_auth_backend {
+    server ${GAME_PROXY_TARGET_HOST}:${GAME_PROXY_AUTH_PORT};
+    keepalive 32;
+}
+
+upstream game_world_backend {
+    server ${GAME_PROXY_TARGET_HOST}:${GAME_PROXY_WORLD_PORT};
+    keepalive 32;
+}
+
+# 认证服务器转发（3724）
 server {
     listen ${GAME_PROXY_AUTH_PORT};
-    proxy_pass ${GAME_PROXY_TARGET_HOST}:${GAME_PROXY_AUTH_PORT};
+    proxy_pass game_auth_backend;
     proxy_timeout 300s;
     proxy_connect_timeout 10s;
 }
 
+# 游戏世界服务器转发（8085）
 server {
     listen ${GAME_PROXY_WORLD_PORT};
-    proxy_pass ${GAME_PROXY_TARGET_HOST}:${GAME_PROXY_WORLD_PORT};
+    proxy_pass game_world_backend;
     proxy_timeout 300s;
     proxy_connect_timeout 10s;
 }

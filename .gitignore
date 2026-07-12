@@ -1,5 +1,0 @@
-.env
-*.log
-storage/*.bak
-vendor/
-.DS_Store

@@ -1,4 +1,4 @@
-/* WoW Realm Portal UI 2026.10.02
+/* WoW Realm Portal UI 2026.10.06
  * Progressive presentation only: no new API, authentication or server commands.
  * All POST actions, field names, CSRF/PIN validation and persistence stay in WowApp.
  */
@@ -879,9 +879,42 @@
     }
     enhanceRegistration();
 
+    const pvpShowcase = node('section', 'ui-pvp-showcase');
+    pvpShowcase.dataset.uiViews = 'overview';
+    pvpShowcase.innerHTML = `
+      <div class="ui-pvp-head">
+        <div>
+          <p class="ui-eyebrow">PVP FEATURES</p>
+          <h2>1V1 竞技场 · 快速战场</h2>
+          <p>为小型私人服务器优化等待时间和对战节奏，保留经典 PvP 的核心体验。</p>
+        </div>
+        <span class="ui-pvp-status">${icon('shield')}自定义 PvP</span>
+      </div>
+      <div class="ui-pvp-grid">
+        <article class="ui-pvp-card">
+          <div class="ui-pvp-card-top">${icon('users')}<span>1V1 ARENA</span></div>
+          <h3>专属 1V1 竞技场</h3>
+          <p>独立 1V1 匹配模式，每队 1 名玩家即可开战。无需凑齐传统 2V2 队伍，更适合小服随时切磋。</p>
+          <div class="ui-pvp-tags"><span>1 人 / 队</span><span>独立匹配</span></div>
+        </article>
+        <article class="ui-pvp-card">
+          <div class="ui-pvp-card-top">${icon('clock')}<span>FAST START</span></div>
+          <h3>20 秒快速准备</h3>
+          <p>竞技场与开放战场采用 20 秒准备时间，并在 20 / 10 / 5 秒进行倒计时提示，减少无意义等待。</p>
+          <div class="ui-pvp-tags"><span>20 秒准备</span><span>20 · 10 · 5 提示</span></div>
+        </article>
+        <article class="ui-pvp-card">
+          <div class="ui-pvp-card-top">${icon('shield')}<span>BATTLEGROUND</span></div>
+          <h3>精简战场池</h3>
+          <p>主推战歌峡谷、阿拉希盆地、风暴之眼；关闭奥特兰克山谷、远古海滩与征服之岛，减少大型地图和载具战等待。</p>
+          <div class="ui-pvp-tags"><span>战歌</span><span>阿拉希</span><span>风暴之眼</span></div>
+        </article>
+      </div>`;
+    hero.after(pvpShowcase);
+
     const homeContent = node('div', 'ui-home-content ui-home-roster-only');
     homeContent.dataset.uiViews = 'overview';
-    hero.after(homeContent);
+    pvpShowcase.after(homeContent);
     const online = $('#online-players');
     homeContent.append(online);
     if (grid) grid.remove();

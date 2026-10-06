@@ -429,6 +429,54 @@
 .wow-console .ui-realm-hero .register-inline-form { gap: 12px; }
 .wow-console .ui-realm-hero .register-inline-form input { min-height: 42px; }
 .wow-console .ui-realm-hero .ui-form-footnote { font-size: 10px; margin-top: 0; }
+
+/* PvP feature strip: 1V1 arena + fast battleground rules. */
+.ui-pvp-showcase {
+  margin: 20px 0;
+  padding: 24px;
+  border: 1px solid rgba(244,181,74,.14);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 8% 0%,rgba(244,181,74,.045),transparent 34%),
+    linear-gradient(145deg,rgba(27,23,39,.94),rgba(15,14,22,.94));
+  box-shadow: 0 14px 44px rgba(0,0,0,.18);
+}
+.ui-pvp-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 18px; margin-bottom: 18px;
+}
+.ui-pvp-head .ui-eyebrow { margin: 0 0 6px; font-size: 9px; letter-spacing: .18em; color: var(--muted); }
+.ui-pvp-head h2 { margin: 0; color: var(--gold); font-size: 19px; letter-spacing: .02em; }
+.ui-pvp-head p:not(.ui-eyebrow) { margin: 7px 0 0; color: var(--muted); font-size: 11px; line-height: 1.8; }
+.ui-pvp-status {
+  display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto;
+  padding: 7px 10px; border-radius: 999px;
+  border: 1px solid rgba(244,181,74,.18);
+  background: rgba(244,181,74,.055);
+  color: var(--gold); font-size: 10px; letter-spacing: .04em;
+}
+.ui-pvp-status .ui-icon { width: 14px; height: 14px; }
+.ui-pvp-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 14px; }
+.ui-pvp-card {
+  min-width: 0; padding: 18px;
+  border: 1px solid var(--border); border-radius: 15px;
+  background: rgba(7,7,12,.26);
+}
+.ui-pvp-card-top {
+  display: flex; align-items: center; gap: 7px;
+  color: var(--gold); font-size: 9px; letter-spacing: .13em; font-weight: 700;
+}
+.ui-pvp-card-top .ui-icon { width: 15px; height: 15px; }
+.ui-pvp-card h3 { margin: 12px 0 8px; color: var(--text); font-size: 15px; }
+.ui-pvp-card p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.85; }
+.ui-pvp-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+.ui-pvp-tags span {
+  padding: 4px 8px; border-radius: 999px;
+  border: 1px solid rgba(244,181,74,.13);
+  color: var(--text); background: rgba(244,181,74,.035);
+  font-size: 9px;
+}
+
 .wow-console .ui-stats { gap: 14px; margin: 20px 0; }
 .wow-console .ui-stat { padding: 17px 21px; border-radius: 15px; }
 .wow-console .ui-stat > strong { font-size: 29px; margin: 6px 0 3px; }
@@ -489,6 +537,8 @@
   .wow-console .topbar nav .ui-nav-link { flex: 1 1 0; justify-content: center; font-size: 12px; padding: 10px; }
   .wow-console .ui-main { padding-top: 20px; }
   .wow-console .hero.ui-realm-hero { grid-template-columns: minmax(0,1fr); gap: 24px; padding: 28px; }
+  .ui-pvp-grid { grid-template-columns: 1fr; }
+  .ui-pvp-showcase { padding: 21px; }
   .ui-realm-line { margin-bottom: 24px; }
   .wow-console .ui-realm-hero .ui-hero-title { font-size: 38px; }
   .wow-console .ui-realm-hero .ui-hero-description { max-width: 610px; }
@@ -508,6 +558,14 @@
   .wow-console .topbar nav { gap: 5px; }
   .wow-console .topbar nav .ui-nav-link { font-size: 11px; padding: 9px 7px; gap: 5px; min-height: 38px; }
   .wow-console .hero.ui-realm-hero { padding: 24px 20px; border-radius: 18px; gap: 24px; }
+  .ui-pvp-showcase { margin: 16px 0; padding: 18px 16px; border-radius: 17px; }
+  .ui-pvp-head { gap: 11px; margin-bottom: 14px; }
+  .ui-pvp-head h2 { font-size: 17px; }
+  .ui-pvp-head p:not(.ui-eyebrow) { font-size: 10px; }
+  .ui-pvp-status { display: none; }
+  .ui-pvp-card { padding: 16px; }
+  .ui-pvp-card h3 { font-size: 14px; }
+  .ui-pvp-card p { font-size: 10px; }
   .ui-realm-line { margin-bottom: 22px; }
   .wow-console .ui-realm-hero .ui-hero-title { font-size: 31px; }
   .wow-console .ui-realm-hero .ui-hero-lead { font-size: 16px; margin-top: 13px; }

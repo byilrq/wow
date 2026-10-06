@@ -14,9 +14,9 @@ $wowPublicUi = json_encode([
     'cacheSeconds' => max(0, (int)($config['status_cache_seconds'] ?? 15)),
 ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
 ob_start(static function (string $html) use ($wowPublicUi): string {
-    $assets = '<link rel="stylesheet" href="assets/console.css?v=20261006-1">'
+    $assets = '<link rel="stylesheet" href="assets/console.css?v=20261006-2">'
         . '<script type="application/json" id="wow-public-ui">' . ($wowPublicUi ?: '{}') . '</script>'
-        . '<script defer src="assets/console.js?v=20261006-1"></script>';
+        . '<script defer src="assets/console.js?v=20261006-2"></script>';
     return str_replace('</head>', $assets . '</head>', $html);
 });
 

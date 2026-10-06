@@ -75,7 +75,13 @@
     check: '<path d="m5 12 4 4L19 6"/>',
     level: '<path d="M4 20h16M6 17v-4h3v4M11 17V9h3v8M16 17V4h3v13"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7v.2"/>',
-    save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2zM7 3v6h10V3M7 21v-8h10v8"/>'
+    save: '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h12l4 4v12a2 2 0 0 1-2 2zM7 3v6h10V3M7 21v-8h10v8"/>',
+    portal: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 2v3M22 12h-3M12 22v-3M2 12h3M5 5l2 2M19 5l-2 2M5 19l2-2M19 19l-2-2"/>',
+    bag: '<path d="M6 8h12l1 13H5L6 8z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/><path d="M9 12h6"/>',
+    sparkles: '<path d="m12 3 1.2 3.3L16.5 7.5l-3.3 1.2L12 12l-1.2-3.3-3.3-1.2 3.3-1.2L12 3zM18.5 13l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2zM6 14l.9 2.6L9.5 17.5l-2.6.9L6 21l-.9-2.6-2.6-.9 2.6-.9L6 14z"/>',
+    swords: '<path d="M14 5 19 2l3 3-3 5M10 19l-5 3-3-3 3-5M14.5 9.5 19 14M9.5 14.5 5 10M8 16 16 8"/>',
+    wand: '<path d="m4 20 11-11"/><path d="m14 4 1-2 1 2 2 1-2 1-1 2-1-2-2-1 2-1zM19 10l.7-1.5.8 1.5 1.5.8-1.5.7-.8 1.5-.7-1.5-1.5-.7 1.5-.8z"/>',
+    bot: '<rect x="4" y="7" width="16" height="13" rx="3"/><path d="M12 3v4M8 12h.01M16 12h.01M8 16h8"/>'
   };
   function icon(name) {
     return `<svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.info}</svg>`;
@@ -849,17 +855,18 @@
     copy.removeAttribute('aria-label');
     copy.replaceChildren(fragment(`
       <div class="ui-realm-line"><span class="ui-realm-tag"></span><span class="ui-realm-version"></span></div>
-      <p class="ui-eyebrow">YOUR WORLD. YOUR COMPANIONS.</p>
-      <h1 class="ui-hero-title"><span>Playerbots</span> AI 机器人</h1>
-      <p class="ui-hero-lead">一个人出发，也有队友同行。</p>
-      <p class="ui-hero-description">Playerbots 为艾泽拉斯带来可交互的 AI 角色：与机器人组队升级、探索世界，协作参与副本战斗，让冒险不必等待队友上线。</p>
+      <p class="ui-eyebrow">CUSTOM WRATH OF THE LICH KING</p>
+      <h1 class="ui-hero-title"><span>黑石</span> · 自定义巫妖王世界</h1>
+      <p class="ui-hero-lead">经典 3.3.5，少一点等待，多一点自由。</p>
+      <p class="ui-hero-description">在原版巫妖王体验上加入 Playerbots AI、全种族全职业、1V1 竞技场、Eluna 便携系统与幻化玩法，让单人冒险、角色养成和 PvP 都更顺手。</p>
       <div class="ui-bot-features">
-        <div>${icon('users')}<span>组队协作</span></div>
-        <div>${icon('book')}<span>任务探索</span></div>
-        <div>${icon('shield')}<span>副本冒险</span></div>
+        <div>${icon('bot')}<span>Playerbots AI</span></div>
+        <div>${icon('grid')}<span>全种族全职业</span></div>
+        <div>${icon('swords')}<span>1V1 竞技场</span></div>
+        <div>${icon('portal')}<span>Eluna 便携系统</span></div>
       </div>
       <div class="ui-hero-actions"></div>
-      <p class="ui-bot-note">机器人数量、行为及开放玩法以服务端配置为准。</p>
+      <p class="ui-bot-note">机器人数量、行为及部分开放玩法以服务端实际配置为准。</p>
     `));
     $('.ui-realm-tag', copy).textContent = realmText;
     $('.ui-realm-version', copy).textContent = config.gameVersion || '巫妖王之怒';
@@ -879,42 +886,66 @@
     }
     enhanceRegistration();
 
-    const pvpShowcase = node('section', 'ui-pvp-showcase');
-    pvpShowcase.dataset.uiViews = 'overview';
-    pvpShowcase.innerHTML = `
-      <div class="ui-pvp-head">
+    const featureShowcase = node('section', 'ui-feature-showcase');
+    featureShowcase.dataset.uiViews = 'overview';
+    featureShowcase.innerHTML = `
+      <div class="ui-feature-head">
         <div>
-          <p class="ui-eyebrow">PVP FEATURES</p>
-          <h2>1V1 竞技场 · 快速战场</h2>
-          <p>为小型私人服务器优化等待时间和对战节奏，保留经典 PvP 的核心体验。</p>
+          <p class="ui-eyebrow">REALM FEATURES</p>
+          <h2>自由构筑 · 便携系统 · 快速 PvP</h2>
+          <p>不是把原版变得繁琐，而是把等待、跑图和重复操作压缩，把时间留给升级、收集、对战和探索。</p>
         </div>
-        <span class="ui-pvp-status">${icon('shield')}自定义 PvP</span>
+        <span class="ui-feature-status">${icon('sparkles')}CUSTOM 3.3.5</span>
       </div>
-      <div class="ui-pvp-grid">
-        <article class="ui-pvp-card">
-          <div class="ui-pvp-card-top">${icon('users')}<span>1V1 ARENA</span></div>
+      <div class="ui-feature-grid">
+        <article class="ui-feature-card ui-feature-card--wide ui-feature-card--freedom">
+          <div class="ui-feature-card-top"><span class="ui-feature-icon">${icon('grid')}</span><span>CHARACTER FREEDOM</span></div>
+          <h3>全种族 × 全职业</h3>
+          <p>开放全部种族与全部职业组合，突破原版种族职业限制。喜欢什么外形、什么职业，就按自己的方式创建角色。</p>
+          <div class="ui-feature-tags"><span>全种族</span><span>全职业</span><span>自由搭配</span></div>
+        </article>
+        <article class="ui-feature-card ui-feature-card--wide ui-feature-card--eluna">
+          <div class="ui-feature-card-top"><span class="ui-feature-icon">${icon('portal')}</span><span>ELUNA · SUPER HEARTHSTONE</span></div>
+          <h3>超级炉石 · 随身服务中心</h3>
+          <p>一块炉石整合回家与设家、在线银行、城市与副本传送、团队与风景秘境传送、双重附魔、训练师，以及随身商人和竞技场大师召唤。</p>
+          <div class="ui-feature-tags"><span>传送网络</span><span>在线银行</span><span>双重附魔</span><span>NPC 召唤</span></div>
+        </article>
+        <article class="ui-feature-card ui-feature-card--merchant">
+          <div class="ui-feature-card-top"><span class="ui-feature-icon">${icon('bag')}</span><span>ELUNA · PORTABLE VENDOR</span></div>
+          <h3>超级商人 · 随叫随到</h3>
+          <p>便携商人集中提供职业雕文、钥匙、宝石、消耗品、施法材料、传家宝与幻化相关物品，减少来回寻找 NPC 的时间。</p>
+          <div class="ui-feature-tags"><span>职业雕文</span><span>宝石</span><span>消耗品</span><span>传家宝</span></div>
+        </article>
+        <article class="ui-feature-card ui-feature-card--transmog">
+          <div class="ui-feature-card-top"><span class="ui-feature-icon">${icon('sparkles')}</span><span>TRANSMOGRIFICATION</span></div>
+          <h3>幻化特色 · 外观自由</h3>
+          <p>独立幻化玩法配合商人提供的外观资源，让装备强度与角色造型分开选择，打造更有辨识度的个人风格。</p>
+          <div class="ui-feature-tags"><span>外观收集</span><span>个性搭配</span><span>幻化物品</span></div>
+        </article>
+        <article class="ui-feature-card ui-feature-card--arena">
+          <div class="ui-feature-card-top"><span class="ui-feature-icon">${icon('swords')}</span><span>1V1 ARENA</span></div>
           <h3>专属 1V1 竞技场</h3>
-          <p>独立 1V1 匹配模式，每队 1 名玩家即可开战。无需凑齐传统 2V2 队伍，更适合小服随时切磋。</p>
-          <div class="ui-pvp-tags"><span>1 人 / 队</span><span>独立匹配</span></div>
+          <p>独立 1V1 匹配模式，每队 1 名玩家即可开战。无需等待传统 2V2 队伍，更适合小型服务器随时切磋。</p>
+          <div class="ui-feature-tags"><span>1 人 / 队</span><span>独立匹配</span><span>随时开战</span></div>
         </article>
-        <article class="ui-pvp-card">
-          <div class="ui-pvp-card-top">${icon('clock')}<span>FAST START</span></div>
+        <article class="ui-feature-card ui-feature-card--wide ui-feature-card--fast">
+          <div class="ui-feature-card-top"><span class="ui-feature-icon">${icon('clock')}</span><span>FAST START</span></div>
           <h3>20 秒快速准备</h3>
-          <p>竞技场与开放战场采用 20 秒准备时间，并在 20 / 10 / 5 秒进行倒计时提示，减少无意义等待。</p>
-          <div class="ui-pvp-tags"><span>20 秒准备</span><span>20 · 10 · 5 提示</span></div>
+          <p>竞技场与开放战场采用 20 秒准备时间，并在 20 / 10 / 5 秒进行清晰倒计时提示，把排队后的等待压到更短。</p>
+          <div class="ui-feature-tags"><span>20 秒准备</span><span>20 · 10 · 5 提示</span></div>
         </article>
-        <article class="ui-pvp-card">
-          <div class="ui-pvp-card-top">${icon('shield')}<span>BATTLEGROUND</span></div>
+        <article class="ui-feature-card ui-feature-card--wide ui-feature-card--bg">
+          <div class="ui-feature-card-top"><span class="ui-feature-icon">${icon('shield')}</span><span>BATTLEGROUND</span></div>
           <h3>精简战场池</h3>
-          <p>主推战歌峡谷、阿拉希盆地、风暴之眼；关闭奥特兰克山谷、远古海滩与征服之岛，减少大型地图和载具战等待。</p>
-          <div class="ui-pvp-tags"><span>战歌</span><span>阿拉希</span><span>风暴之眼</span></div>
+          <p>主推战歌峡谷、阿拉希盆地与风暴之眼；关闭奥特兰克山谷、远古海滩和征服之岛，减少大型地图、载具战与漫长等待。</p>
+          <div class="ui-feature-tags"><span>战歌峡谷</span><span>阿拉希盆地</span><span>风暴之眼</span></div>
         </article>
       </div>`;
-    hero.after(pvpShowcase);
+    hero.after(featureShowcase);
 
     const homeContent = node('div', 'ui-home-content ui-home-roster-only');
     homeContent.dataset.uiViews = 'overview';
-    pvpShowcase.after(homeContent);
+    featureShowcase.after(homeContent);
     const online = $('#online-players');
     homeContent.append(online);
     if (grid) grid.remove();

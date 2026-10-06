@@ -89,23 +89,81 @@ setup_php_repo() {
   fi
 }
 
+# 放行本机防火墙 TCP 端口。
+# 注意：这里只修改 VPS 操作系统内的防火墙；云厂商安全组/云防火墙仍需在控制台放行。
+# 不会自动启用 UFW/firewalld，避免在 SSH 使用非默认端口时误锁服务器。
 open_tcp_port() {
   local port="$1"
+  local handled="false"
+
+  # UFW：无论当前是否 active 都预先写入规则；若已启用则立即生效。
   if command -v ufw >/dev/null 2>&1; then
-    ufw allow "${port}/tcp" || true
-  elif command -v firewall-cmd >/dev/null 2>&1; then
-    firewall-cmd --permanent --add-port="${port}/tcp" || true
-    firewall-cmd --reload || true
-  elif command -v iptables >/dev/null 2>&1; then
-    iptables -C INPUT -p tcp --dport "$port" -j ACCEPT 2>/dev/null || iptables -I INPUT -p tcp --dport "$port" -j ACCEPT || true
+    if ufw allow "${port}/tcp" >/dev/null 2>&1; then
+      echo "✅ UFW 已放行 TCP ${port}"
+      handled="true"
+    else
+      echo "⚠️ UFW 写入 TCP ${port} 规则失败"
+    fi
   fi
+
+  # firewalld：仅在服务运行时处理，同时写入运行时和永久规则。
+  if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then
+    firewall-cmd --add-port="${port}/tcp" >/dev/null 2>&1 || true
+    firewall-cmd --permanent --add-port="${port}/tcp" >/dev/null 2>&1 || true
+    echo "✅ firewalld 已放行 TCP ${port}"
+    handled="true"
+  fi
+
+  # iptables：兼容 Debian/Ubuntu 常见的 iptables-nft 后端。
+  # 如果系统安装了 netfilter-persistent，则同时保存规则以便重启后继续生效。
+  if command -v iptables >/dev/null 2>&1; then
+    if ! iptables -C INPUT -p tcp --dport "$port" -j ACCEPT >/dev/null 2>&1; then
+      iptables -I INPUT 1 -p tcp --dport "$port" -j ACCEPT >/dev/null 2>&1 || true
+    fi
+    if iptables -C INPUT -p tcp --dport "$port" -j ACCEPT >/dev/null 2>&1; then
+      echo "✅ iptables 已放行 TCP ${port}"
+      handled="true"
+      if command -v netfilter-persistent >/dev/null 2>&1; then
+        netfilter-persistent save >/dev/null 2>&1 || true
+      fi
+    fi
+  fi
+
+  # 纯 nftables 环境：只处理最常见的 inet filter/input 结构，不擅自改写未知规则集。
+  if [[ "$handled" != "true" ]] && command -v nft >/dev/null 2>&1; then
+    if nft list chain inet filter input >/dev/null 2>&1; then
+      if ! nft list chain inet filter input 2>/dev/null | grep -Eq "tcp dport ${port} .*accept"; then
+        nft add rule inet filter input tcp dport "$port" accept comment "woweb-${port}" >/dev/null 2>&1 || true
+      fi
+      if nft list chain inet filter input 2>/dev/null | grep -Eq "tcp dport ${port} .*accept"; then
+        echo "✅ nftables 已放行 TCP ${port}"
+        handled="true"
+      fi
+    fi
+  fi
+
+  if [[ "$handled" != "true" ]]; then
+    echo "⚠️ 未能自动确认 TCP ${port} 的本机防火墙放行规则。"
+    echo "   请检查 ufw / firewalld / iptables / nftables，以及 VPS 服务商安全组。"
+  fi
+
+  # 始终返回成功，避免防火墙工具差异中断网站安装流程。
+  return 0
 }
 
 open_firewall_ports() {
-  [[ "$WOW_BIND_MODE" == "public_https" ]] && { open_tcp_port 80; open_tcp_port 443; }
+  log "检查并放行防火墙端口"
+
+  if [[ "$WOW_BIND_MODE" == "public_https" ]]; then
+    open_tcp_port 80
+    open_tcp_port 443
+  fi
+
   if [[ "$GAME_PROXY_ENABLE" == "true" ]]; then
     open_tcp_port "$GAME_PROXY_AUTH_PORT"
     open_tcp_port "$GAME_PROXY_WORLD_PORT"
+    echo "✅ WoW 游戏端口要求：TCP ${GAME_PROXY_AUTH_PORT} / ${GAME_PROXY_WORLD_PORT}"
+    echo "ℹ️ 如 VPS 服务商还有安全组/云防火墙，也必须在控制台放行以上 TCP 端口。"
   fi
 }
 
@@ -452,45 +510,6 @@ renew_cert() {
   echo "✅ 已执行 certbot renew。"
 }
 
-
-restart_web() {
-  local php_unit="php${PHP_VER}-fpm"
-
-  log "重启 WEB 服务"
-
-  if ! command -v nginx >/dev/null 2>&1; then
-    echo "❌ 未找到 nginx，无法重启 WEB。"
-    return 1
-  fi
-
-  if ! nginx -t; then
-    echo "❌ Nginx 配置检查失败，已取消重载。"
-    return 1
-  fi
-
-  if ! systemctl restart "$php_unit"; then
-    echo "❌ ${php_unit} 重启失败。"
-    return 1
-  fi
-
-  # Nginx 同时承担 WoW 3724 / 8085 stream 转发。
-  # 使用 reload 而不是 restart，尽量避免中断现有游戏连接。
-  if ! systemctl reload nginx; then
-    echo "❌ Nginx 平滑重载失败。"
-    return 1
-  fi
-
-  if systemctl is-active --quiet "$php_unit" && systemctl is-active --quiet nginx; then
-    echo "✅ WEB 已重启：${php_unit} 已重启，Nginx 已平滑重载。"
-    echo "✅ 现有 WoW TCP 转发连接不会被主动强制断开。"
-    return 0
-  fi
-
-  echo "⚠️ WEB 操作已执行，但服务状态异常："
-  systemctl --no-pager --full status "$php_unit" nginx 2>/dev/null || true
-  return 1
-}
-
 menu() {
   require_root
   local saved
@@ -507,7 +526,6 @@ menu() {
   echo "1) 一键安装 / 更新网站"
   echo "2) 修改域名"
   echo "3) 更新证书（仅 public_https 模式）"
-  echo "4) 重启 WEB（PHP-FPM + Nginx 平滑重载）"
   echo "0) 退出"
   echo "------------------------------------------"
   read -rp "请输入选项编号：" choice
@@ -534,7 +552,6 @@ menu() {
       ;;
     2) change_domain ;;
     3) renew_cert ;;
-    4) restart_web ;;
     0) echo "已退出。" ;;
     *) echo "无效选项。"; exit 1 ;;
   esac
